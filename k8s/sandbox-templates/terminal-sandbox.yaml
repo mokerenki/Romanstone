@@ -1,0 +1,8 @@
+"""terminal-sandbox.yaml — Phase 2 (SCAFFOLD)
+
+Kubernetes sandbox template for terminal/REPL execution.
+TODO: Define Pod spec with Python + tools container,
+      resource limits, network policies.
+"""
+
+# SCAFFOLD — Phase 2 implementation pending

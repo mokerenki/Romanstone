@@ -1,0 +1,57 @@
+# Heartbeat Configuration — Phase 1
+# Defines probes, schedules, and policy rules
+
+scheduler:
+  interval_seconds: 300  # 5 minutes
+  active_hours:
+    start: "06:00"
+    end: "22:00"
+  timezone: "Africa/Johannesburg"
+
+probes:
+  court_roll_rss:
+    type: http
+    url: "https://example-court.gov.za/roll/rss"
+    expected_status: 200
+    timeout: 10
+
+  shared_drive_scan:
+    type: file
+    path: "/mnt/shared/court_filings"
+    check: new_files  # trigger on any new file
+
+  document_queue_depth:
+    type: queue
+    queue_name: "document_ingest"
+    threshold: 50  # escalate if > 50 pending
+
+  case_database_health:
+    type: http
+    url: "http://case-db.internal/health"
+    expected_status: 200
+
+policy_rules:
+  - name: "new_court_filing"
+    condition: "probes.court_roll_rss.status == 200 AND probes.shared_drive_scan.new_files > 0"
+    action: "MemoryIngestTask"
+    priority: high
+
+  - name: "queue_backlog"
+    condition: "probes.document_queue_depth.depth > probes.document_queue_depth.threshold"
+    action: "EscalateToLLM"
+    priority: critical
+
+  - name: "database_down"
+    condition: "probes.case_database_health.status != 200"
+    action: "AlertAdmin"
+    priority: critical
+
+escalation:
+  llm_threshold: "ambiguous_or_conflicting"
+  max_escalations_per_hour: 10
+
+authorized_actions:
+  - MemoryIngestTask
+  - DocumentClassificationTask
+  - AlertAdmin
+  # All other actions require human approval
