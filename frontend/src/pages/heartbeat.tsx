@@ -1,7 +1,6 @@
-"""heartbeat.tsx — Page scaffold
-
-TODO: Implement page layout, data fetching, error handling.
-"""
+// heartbeat.tsx — Page scaffold
+//
+// TODO: Implement page layout, data fetching, error handling.
 
 // SCAFFOLD
 export default function Page() {
