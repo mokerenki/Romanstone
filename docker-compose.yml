@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,7 +15,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Phase 1: Qdrant vector store
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -25,12 +22,11 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && echo ok || exit 1'"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Phase 1: Redis for ingest worker
   redis:
     image: redis:7-alpine
     ports:
@@ -71,8 +67,14 @@ services:
     volumes:
       - aether_sandbox:/tmp/aether/sandbox
 
-  # Phase 2: Kubernetes not included in docker-compose
-  # Use k3s or minikube for local K8s development
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

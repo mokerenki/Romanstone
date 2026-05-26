@@ -12,6 +12,9 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
+from app.tools.browser_tool import BrowserTool
+from app.tools.python_repl import PythonREPLTool
+
 from app.core.config import CONFIG
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
@@ -23,6 +26,8 @@ router = APIRouter()
 _checkpointer = MemorySaver()
 _router = ModelRouter()
 _registry = ToolRegistry()  # TODO: populate with actual tools
+_registry.register(BrowserTool())
+_registry.register(PythonREPLTool())
 
 
 @router.get("/health")

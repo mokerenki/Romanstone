@@ -130,8 +130,8 @@ class ModelRouter:
     ROLE_FALLBACK = "fallback"
 
     def __init__(self):
-        self._kimi = KimiK2Client()
-        self._deepseek = DeepSeekClient()
+        self._kimi = KimiK2Client(CONFIG.kimi_k2)
+        self._deepseek = DeepSeekClient(CONFIG.deepseek)
         self._role_map = {
             self.ROLE_PLANNING: self._kimi,
             self.ROLE_VERIFICATION: self._deepseek,

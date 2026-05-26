@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+from pydantic_settings import BaseSettings
+
 
 @dataclass(frozen=True)
 class ModelConfig:
@@ -128,3 +130,16 @@ class AetherConfig:
 
 
 CONFIG = AetherConfig()
+
+
+class Settings(BaseSettings):
+    database_url: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/romanstone"
+    redis_url: str = "redis://redis:6379/0"
+    kimi_api_key: str = ""
+    deepseek_api_key: str = ""
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
