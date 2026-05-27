@@ -3,7 +3,9 @@ Aether — FastAPI Entry Point
 Bootstraps the full application with Phase 0/1/2 modules.
 """
 
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Request
+from fastapi.responses import JSONResponse
+import os
 from fastapi.middleware.cors import CORSMiddleware
 
 # ---------------------------------------------------------------
@@ -25,7 +27,11 @@ async def root():
     return {
         "name": "Aether",
         "version": "0.1.0",
-        "phases": {"0": "complete"}
+        "phases": {"0": "complete"},
+        "env_check": {
+            "kimi_key_set": bool(os.getenv("KIMI_API_KEY")),
+            "deepseek_key_set": bool(os.getenv("DEEPSEEK_API_KEY"))
+        }
     }
 
 app.include_router(root_router)
@@ -41,6 +47,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # This prevents the "Internal Server Error" plain text response
+    print(f"ERROR: {type(exc).__name__}: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
+
 # ---------------------------------------------------------------
 # 4. Tool registration (must happen before routers are used)
 # ---------------------------------------------------------------
@@ -48,15 +63,15 @@ from app.tools.registry import ToolRegistry
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 
-import app.api.tasks as tasks_module
-tasks_module._registry.register(BrowserTool())
-tasks_module._registry.register(PythonREPLTool())
+from app.api import tasks
+tasks._registry.register(BrowserTool())
+tasks._registry.register(PythonREPLTool())
 
 # ---------------------------------------------------------------
 # 5. Include API routers
 # ---------------------------------------------------------------
-from app.api import tasks, heartbeat_config, rbac
+#from app.api import tasks, heartbeat_config, rbac
 
-app.include_router(tasks.router, prefix="/api")
-app.include_router(heartbeat_config.router, prefix="/api")
-app.include_router(rbac.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api/v1")
+#app.include_router(heartbeat_config.router, prefix="/api")
+#app.include_router(rbac.router, prefix="/api")
