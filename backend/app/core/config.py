@@ -133,7 +133,7 @@ CONFIG = AetherConfig()
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/romanstone"
+    database_url: str = "postgresql+asyncpg://aether:aether@postgres:5432/aether"
     redis_url: str = "redis://redis:6379/0"
     kimi_api_key: str = ""
     deepseek_api_key: str = ""

@@ -54,6 +54,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       KIMI_API_KEY: ${KIMI_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://aether:aether@postgres:5432/aether
       COGNEE_ENABLED: "false"
       SANDBOX_ENABLED: "false"
       RBAC_ENABLED: "false"
@@ -66,6 +67,11 @@ services:
         condition: service_healthy
     volumes:
       - aether_sandbox:/tmp/aether/sandbox
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build: ./frontend

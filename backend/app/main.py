@@ -34,7 +34,7 @@ async def root():
         }
     }
 
-app.include_router(root_router)
+app.include_router(root_router, prefix="/api")
 
 # ---------------------------------------------------------------
 # 3. CORS (open for development – restrict in production)

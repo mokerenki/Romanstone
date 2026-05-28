@@ -1,7 +1,12 @@
-"""ModelRouter — Phase 0 (COMPLETE)
+"""
+ModelRouter — Phase 0 (COMPLETE)
 
-Routes planning to Kimi K2, verification to DeepSeek.
+Routes planning to Kimi K2.6, verification to DeepSeek.
 All calls traced via Opik with cost attribution.
+
+Kimi model: kimi-k2.6 (OpenAI-compatible endpoint)
+Base URL:   https://api.moonshot.ai/v1   (default from config)
+DeepSeek:   unchanged
 """
 
 import time
@@ -17,7 +22,16 @@ from app.core.config import CONFIG, ModelConfig
 
 logger = structlog.get_logger("aether.model_router")
 
+# ------------------------------------------------------------------
+# Pricing constants (USD per 1M tokens) – update if needed
+# These are for the kimi-k2.6 model via Moonshot official API.
+# ------------------------------------------------------------------
+KIMI_K26_INPUT_PRICE  = 0.95
+KIMI_K26_OUTPUT_PRICE = 4.00
+DEEPSEEK_INPUT_PRICE  = 0.14   # V4-Flash
+DEEPSEEK_OUTPUT_PRICE = 0.28
 
+# ------------------------------------------------------------------
 @dataclass(frozen=True)
 class TokenUsage:
     input_tokens: int = 0
@@ -25,7 +39,6 @@ class TokenUsage:
 
     def total_cost(self, in_cost: float, out_cost: float) -> float:
         return (self.input_tokens / 1_000_000) * in_cost + (self.output_tokens / 1_000_000) * out_cost
-
 
 @dataclass(frozen=True)
 class ModelResponse:
@@ -35,7 +48,6 @@ class ModelResponse:
     usage: TokenUsage
     latency_ms: float
     raw: Optional[Dict[str, Any]] = None
-
 
 class BaseModelClient(ABC):
     def __init__(self, config: ModelConfig):
@@ -63,10 +75,11 @@ class BaseModelClient(ABC):
 
 
 class KimiK2Client(BaseModelClient):
-    @track(project_name="aether", name="kimi_k2_chat")
+    @track(project_name="aether", name="kimi_k26_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
         payload = {
+            # IMPORTANT: model is taken from config (set to "kimi-k2.6" in .env)
             "model": self.config.model,
             "messages": messages,
             "temperature": temperature or self.config.temperature,
@@ -82,13 +95,13 @@ class KimiK2Client(BaseModelClient):
         usage = self._parse_usage(data)
         latency = (time.perf_counter() - start) * 1000
 
-        logger.info("kimi_k2.complete", model=self.config.model,
+        logger.info("kimi_k26.complete", model=payload["model"],
                     input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
                     latency_ms=round(latency, 2))
 
         return ModelResponse(
             content=data["choices"][0]["message"]["content"],
-            model=self.config.model, provider="kimi",
+            model=payload["model"], provider="kimi",
             usage=usage, latency_ms=latency, raw=data,
         )
 
@@ -113,13 +126,13 @@ class DeepSeekClient(BaseModelClient):
         usage = self._parse_usage(data)
         latency = (time.perf_counter() - start) * 1000
 
-        logger.info("deepseek.complete", model=self.config.model,
+        logger.info("deepseek.complete", model=payload["model"],
                     input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
                     latency_ms=round(latency, 2))
 
         return ModelResponse(
             content=data["choices"][0]["message"]["content"],
-            model=self.config.model, provider="deepseek",
+            model=payload["model"], provider="deepseek",
             usage=usage, latency_ms=latency, raw=data,
         )
 
@@ -130,7 +143,17 @@ class ModelRouter:
     ROLE_FALLBACK = "fallback"
 
     def __init__(self):
-        self._kimi = KimiK2Client(CONFIG.kimi_k2)
+        # -------------------------------------------------------
+        # Ensure the Kimi model is set to kimi-k2.6.
+        # You can override via environment: KIMI_K2_MODEL=kimi-k2.6
+        # -------------------------------------------------------
+        kimi_cfg = CONFIG.kimi_k2
+        if not kimi_cfg.model or kimi_cfg.model.startswith("kimi-k2-"):
+            # Automatically upgrade old model names to k2.6
+            logger.info("model_router.upgrading_kimi_model", old=kimi_cfg.model, new="kimi-k2.6")
+            kimi_cfg = kimi_cfg._replace(model="kimi-k2.6")
+
+        self._kimi = KimiK2Client(kimi_cfg)
         self._deepseek = DeepSeekClient(CONFIG.deepseek)
         self._role_map = {
             self.ROLE_PLANNING: self._kimi,
