@@ -151,7 +151,7 @@ class ModelRouter:
         if not kimi_cfg.model or kimi_cfg.model.startswith("kimi-k2-"):
             # Automatically upgrade old model names to k2.6
             logger.info("model_router.upgrading_kimi_model", old=kimi_cfg.model, new="kimi-k2.6")
-            kimi_cfg = kimi_cfg._replace(model="kimi-k2.6")
+            kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-k2.6")
 
         self._kimi = KimiK2Client(kimi_cfg)
         self._deepseek = DeepSeekClient(CONFIG.deepseek)

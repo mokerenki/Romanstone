@@ -35,7 +35,7 @@ async def health():
     return {"status": "healthy", "phase": "0"}
 
 
-@router.post("/v1/tasks")
+@router.post("/tasks")
 async def create_task(request: Dict[str, Any]):
     """Synchronous task execution (non-streaming)."""
     from app.agents.planner import PlannerNode

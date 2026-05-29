@@ -64,8 +64,8 @@ from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 
 from app.api import tasks
-tasks._registry.register(BrowserTool())
-tasks._registry.register(PythonREPLTool())
+#tasks._registry.register(BrowserTool())
+#tasks._registry.register(PythonREPLTool())
 
 # ---------------------------------------------------------------
 # 5. Include API routers
