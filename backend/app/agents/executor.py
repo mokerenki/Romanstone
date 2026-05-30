@@ -1,113 +1,51 @@
-"""ExecutorNode — Phase 0 (COMPLETE)
-
-Executes plan steps using the ToolRegistry.
-"""
-
-import asyncio
-import json
-import time
-from typing import Any, Dict, List
-
-import structlog
-from langchain_core.messages import ToolMessage
-from opik import track
-
-logger = structlog.get_logger("aether.executor")
-
+from app.tools.registry import ToolRegistry
+from app.core.model_router import ModelRouter
 
 class ExecutorNode:
-    def __init__(self, registry):
+    def __init__(self, registry: ToolRegistry, router: ModelRouter):
         self.registry = registry
+        self.router = router
 
-    @track(project_name="aether", name="executor_node")
-    async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info("executor.start", task_id=state.get("task_id"))
+    async def __call__(self, state: dict) -> dict:
+        step = state["plan"][state["current_step"]]
+        results = state.get("results", [])
 
-        plan = state.get("plan", [])
-        current_idx = state.get("current_step_index", 0)
-        tool_calls = state.get("tool_calls", [])
-        metrics = state.get("cost_metrics", {
-            "kimi_input_tokens": 0, "kimi_output_tokens": 0,
-            "deepseek_input_tokens": 0, "deepseek_output_tokens": 0,
-            "total_cost_usd": 0.0, "tool_calls": 0
-        })
+        if step.get("tool"):
+            tool = self.registry.get(step["tool"])
+            result = await tool.execute(**step.get("args", {}))
+            results.append({
+                "step": step.get("description", ""),
+                "tool": step["tool"],
+                "output": result.get("output", "")
+            })
+        else:
+            # No tool – use LLM with all previous results as context
+            # Build a clean context string
+            context_parts = []
+            for r in results:
+                if isinstance(r, dict):
+                    context_parts.append(f"Step: {r.get('step', '')}\nResult: {r.get('output', '')}")
+                else:
+                    context_parts.append(str(r))
+            context = "\n\n".join(context_parts)
 
-        if current_idx >= len(plan):
-            return {"status": "verifying"}
+            prompt = f"""Based on the information gathered, complete the following action.
 
-        step = plan[current_idx]
+Action: {step['action']}
 
-        for dep_id in step.get("depends_on", []):
-            dep = next((s for s in plan if s["step_id"] == dep_id), None)
-            if not dep or dep["status"] != "completed":
-                return {"status": "failed", "final_answer": f"Dependency {dep_id} not met"}
+Context from previous steps:
+{context}
 
-        step["status"] = "running"
-        tool_name = step.get("tool_name")
-        tool_args = step.get("tool_args", {})
+User's original task: {state['task']}
 
-        if not tool_name:
-            step["status"] = "completed"
-            step["result"] = step.get("description", "")
-            return {
-                "plan": plan,
-                "current_step_index": current_idx + 1,
-                "status": "verifying" if (current_idx + 1) >= len(plan) else "executing",
-            }
+If this is a final answer, write a clear, complete, and concise paragraph that directly answers the user. Do not include raw JSON or tool outputs. Use proper grammar."""
+            llm_resp = await self.router.route("deepseek", prompt)
+            results.append({
+                "step": step.get("description", ""),
+                "output": llm_resp.content
+            })
 
-        start = time.perf_counter()
-        result_str = None
-        error_str = None
-        retries = 0
-        max_retries = 3
-
-        while retries <= max_retries:
-            try:
-                tool = self.registry.get(tool_name)
-                if not tool:
-                    raise ValueError(f"Tool '{tool_name}' not found")
-                result = await tool.execute(**tool_args)
-                result_str = json.dumps(result) if not isinstance(result, str) else result
-                break
-            except Exception as e:
-                retries += 1
-                error_str = str(e)
-                if retries > max_retries:
-                    break
-                await asyncio.sleep(0.5 * retries)
-
-        latency = (time.perf_counter() - start) * 1000
-
-        tool_call = {
-            "tool_name": tool_name,
-            "arguments": tool_args,
-            "result": result_str,
-            "error": error_str,
-            "retry_count": retries,
-            "latency_ms": latency,
-        }
-        tool_calls.append(tool_call)
-        metrics["tool_calls"] = len(tool_calls)
-
-        if error_str and retries > max_retries:
-            step["status"] = "failed"
-            step["result"] = error_str
-            return {
-                "plan": plan, "tool_calls": tool_calls, "cost_metrics": metrics,
-                "status": "failed",
-                "final_answer": f"Tool '{tool_name}' failed after {max_retries} retries: {error_str}",
-            }
-
-        step["status"] = "completed"
-        step["result"] = result_str
-        next_idx = current_idx + 1
-        is_done = next_idx >= len(plan)
-
-        return {
-            "plan": plan,
-            "current_step_index": next_idx,
-            "tool_calls": tool_calls,
-            "cost_metrics": metrics,
-            "status": "verifying" if is_done else "executing",
-            "messages": [ToolMessage(content=result_str or error_str or "", tool_call_id=step["step_id"])],
-        }
+        new_state = {**state}
+        new_state["results"] = results
+        new_state["current_step"] = state["current_step"] + 1
+        return new_state

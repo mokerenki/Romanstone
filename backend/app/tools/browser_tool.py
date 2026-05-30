@@ -1,7 +1,7 @@
 """
 BrowserTool – Phase 0 search‑enhanced stub.
 
-Uses DuckDuckGo Instant Answer API with retries and an HTML fallback.
+Uses DuckDuckGo Instant Answer API with retries and HTML fallback.
 Full browser‑use (Playwright) will be added in Phase 1.
 """
 
@@ -35,7 +35,6 @@ class BrowserTool(BaseTool):
         if not query:
             return {"output": "No search query provided."}
 
-        # Common headers to avoid being blocked
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -44,7 +43,7 @@ class BrowserTool(BaseTool):
             )
         }
 
-        # ---------- Phase 1: Instant Answer API (with retry) ----------
+        # Phase 1: Instant Answer API (with retry on 202)
         api_url = "https://api.duckduckgo.com/"
         api_params = {
             "q": query,
@@ -66,35 +65,28 @@ class BrowserTool(BaseTool):
                         data = resp.json()
                         abstract = data.get("AbstractText")
                         if abstract:
-                            return {"output": abstract}
+                            return {"output": self._clean_snippet(abstract, query)}
                         answer = data.get("Answer")
                         if answer:
-                            return {"output": answer}
+                            return {"output": self._clean_snippet(answer, query)}
                         related = data.get("RelatedTopics", [])
                         if related:
                             first = related[0]
                             if isinstance(first, dict) and "Text" in first:
-                                return {"output": first["Text"]}
+                                return {"output": self._clean_snippet(first["Text"], query)}
                             elif isinstance(first, str):
-                                return {"output": first}
-                        # No usable text found; go to fallback
+                                return {"output": self._clean_snippet(first, query)}
+                        # No usable text, go to fallback
                         break
 
                     elif resp.status_code == 202:
-                        # DuckDuckGo sometimes returns 202 – wait a moment and retry
-                        logger.warning(
-                            "duckduckgo_202_retry", query=query, attempt=attempt
-                        )
+                        logger.warning("duckduckgo_202_retry", query=query, attempt=attempt)
                         await asyncio.sleep(1.0)
-                        continue  # second attempt
+                        continue
 
                     else:
-                        logger.warning(
-                            "duckduckgo_api_bad_status",
-                            status=resp.status_code,
-                            query=query,
-                        )
-                        break  # fallback
+                        logger.warning("duckduckgo_api_bad_status", status=resp.status_code, query=query)
+                        break
 
             except httpx.TimeoutException:
                 logger.warning("duckduckgo_timeout", query=query, attempt=attempt)
@@ -104,41 +96,42 @@ class BrowserTool(BaseTool):
                 logger.error("duckduckgo_api_error", error=str(exc))
                 break
 
-        # ---------- Phase 2: HTML fallback ----------
+        # Phase 2: HTML fallback
         try:
-            async with httpx.AsyncClient(
-                follow_redirects=True, timeout=15.0
-            ) as client:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
                 resp = await client.get(
                     "https://html.duckduckgo.com/html/",
                     params={"q": query},
                     headers=headers,
                 )
                 if resp.status_code == 200:
-                    # Use BeautifulSoup if available, otherwise a simple regex
                     try:
                         from bs4 import BeautifulSoup
-
                         soup = BeautifulSoup(resp.text, "html.parser")
                         snippets = soup.select(".result__snippet")
                         if snippets:
-                            return {
-                                "output": snippets[0].get_text(strip=True)
-                            }
+                            return {"output": self._clean_snippet(snippets[0].get_text(strip=True), query)}
                     except ImportError:
-                        # Fallback to a simple regex extraction (less accurate)
                         import re
-
                         matches = re.findall(
                             r'<a class="result__snippet"[^>]*>([^<]+)',
                             resp.text,
                         )
                         if matches:
-                            return {"output": matches[0].strip()}
-
+                            return {"output": self._clean_snippet(matches[0].strip(), query)}
         except Exception as exc:
             logger.error("duckduckgo_html_fallback_error", error=str(exc))
 
-        return {
-            "output": f"No results found for '{query}'. Try rephrasing your query."
-        }
+        return {"output": f"No results found for '{query}'. Try rephrasing your query."}
+
+    def _clean_snippet(self, text: str, query: str) -> str:
+        """Ensure the snippet is a self‑contained sentence."""
+        if not text:
+            return text
+        # If text starts with a lowercase or a pronoun, prepend the query
+        if text[0].islower() or text.startswith(("He ", "She ", "It ", "They ")):
+            text = f"{query} – {text}"
+        # Add a period if missing
+        if not text.endswith(('.', '!', '?')):
+            text += '.'
+        return text.strip()
