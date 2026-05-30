@@ -6,13 +6,13 @@ Full browser‑use (Playwright) will be added in Phase 1.
 """
 
 import asyncio
-import logging
+import structlog
 
 import httpx
 
 from app.tools.registry import BaseTool, ToolSchema
 
-logger = logging.getLogger("aether.tools.browser")
+logger = structlog.get_logger("aether.tools.browser")
 
 
 class BrowserTool(BaseTool):
@@ -93,7 +93,7 @@ class BrowserTool(BaseTool):
                 await asyncio.sleep(0.5)
                 continue
             except Exception as exc:
-                logger.error("duckduckgo_api_error", error=str(exc))
+                logger.exception("duckduckgo_api_error")
                 break
 
         # Phase 2: HTML fallback
@@ -120,7 +120,7 @@ class BrowserTool(BaseTool):
                         if matches:
                             return {"output": self._clean_snippet(matches[0].strip(), query)}
         except Exception as exc:
-            logger.error("duckduckgo_html_fallback_error", error=str(exc))
+            logger.exception("duckduckgo_html_fallback_error")
 
         return {"output": f"No results found for '{query}'. Try rephrasing your query."}
 

@@ -27,7 +27,7 @@ export default function Home() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch("/api/v1/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: task, user_id: "dashboard" }),

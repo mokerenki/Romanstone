@@ -9,6 +9,7 @@ Base URL:   https://api.moonshot.ai/v1   (default from config)
 DeepSeek:   unchanged
 """
 
+import dataclasses
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -52,10 +53,13 @@ class ModelResponse:
 class BaseModelClient(ABC):
     def __init__(self, config: ModelConfig):
         self.config = config
+        headers = {}
+        if config.api_key:
+            headers["Authorization"] = f"Bearer {config.api_key}"
         self._client = httpx.AsyncClient(
             base_url=config.base_url or "",
             timeout=httpx.Timeout(config.timeout),
-            headers={"Authorization": f"Bearer {config.api_key}"},
+            headers=headers,
         )
 
     @abstractmethod
@@ -78,16 +82,28 @@ class KimiK2Client(BaseModelClient):
     @track(project_name="aether", name="kimi_k26_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
+        # Use a copy to avoid mutating the original messages list
+        payload_messages = list(messages)
+        if system_prompt:
+            payload_messages.insert(0, {"role": "system", "content": system_prompt})
+
         payload = {
             # IMPORTANT: model is taken from config (set to "kimi-k2.6" in .env)
             "model": self.config.model,
             "messages": messages,
             "temperature": temperature or self.config.temperature,
             "max_tokens": max_tokens or self.config.max_tokens,
+            "messages": payload_messages,
             "stream": False,
         }
         if system_prompt:
             payload["messages"].insert(0, {"role": "system", "content": system_prompt})
+
+        # Only include parameters if they are explicitly set to avoid 400 Bad Request
+        temp = temperature if temperature is not None else self.config.temperature
+        if temp is not None: payload["temperature"] = temp
+        max_t = max_tokens if max_tokens is not None else self.config.max_tokens
+        if max_t is not None: payload["max_tokens"] = max_t
 
         resp = await self._client.post("/chat/completions", json=payload)
         resp.raise_for_status()
@@ -110,15 +126,25 @@ class DeepSeekClient(BaseModelClient):
     @track(project_name="aether", name="deepseek_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
+        payload_messages = list(messages)
+        if system_prompt:
+            payload_messages.insert(0, {"role": "system", "content": system_prompt})
+
         payload = {
             "model": self.config.model,
             "messages": messages,
             "temperature": temperature or self.config.temperature,
             "max_tokens": max_tokens or self.config.max_tokens,
+            "messages": payload_messages,
             "stream": False,
         }
         if system_prompt:
             payload["messages"].insert(0, {"role": "system", "content": system_prompt})
+
+        temp = temperature if temperature is not None else self.config.temperature
+        if temp is not None: payload["temperature"] = temp
+        max_t = max_tokens if max_tokens is not None else self.config.max_tokens
+        if max_t is not None: payload["max_tokens"] = max_t
 
         resp = await self._client.post("/chat/completions", json=payload)
         resp.raise_for_status()
@@ -155,6 +181,13 @@ class ModelRouter:
 
         self._kimi = KimiK2Client(kimi_cfg)
         self._deepseek = DeepSeekClient(CONFIG.deepseek)
+        
+        ds_cfg = CONFIG.deepseek
+        if not ds_cfg.model or "flash" in ds_cfg.model.lower():
+            logger.info("model_router.fixing_deepseek_model", old=ds_cfg.model, new="deepseek-chat")
+            ds_cfg = dataclasses.replace(ds_cfg, model="deepseek-chat")
+            
+        self._deepseek = DeepSeekClient(ds_cfg)
         self._role_map = {
             self.ROLE_PLANNING: self._kimi,
             self.ROLE_VERIFICATION: self._deepseek,
@@ -176,7 +209,7 @@ class ModelRouter:
             return await client.chat(messages, system_prompt, temperature, max_tokens)
         except Exception as e:
             if role == self.ROLE_PLANNING:
-                logger.warning("model_router.fallback", error=str(e))
+                logger.warning("model_router.fallback: %s", e)
                 return await self._deepseek.chat(messages, system_prompt, temperature, max_tokens)
             raise
 

@@ -47,10 +47,10 @@ async def create_task(request: Dict[str, Any]):
 
     from app.graph import create_graph
 
-    graph = create_graph(_router, _registry)
+    graph = create_graph(_router, _registry, _checkpointer)
 
     initial_state = {
-        "task_id": task_id, "user_id": user_id, "tenant_id": tenant_id,
+        "task_id": task_id,"task": user_message, "user_id": user_id, "tenant_id": tenant_id,
         "messages": [HumanMessage(content=user_message)],
         "plan": [], "current_step_index": 0, "tool_calls": [],
         "verification": None, "needs_replan": False, "final_answer": None,

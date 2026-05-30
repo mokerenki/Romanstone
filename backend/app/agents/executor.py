@@ -39,7 +39,7 @@ Context from previous steps:
 User's original task: {state['task']}
 
 If this is a final answer, write a clear, complete, and concise paragraph that directly answers the user. Do not include raw JSON or tool outputs. Use proper grammar."""
-            llm_resp = await self.router.route("deepseek", prompt)
+            llm_resp = await self.router.route("fallback", [{"role": "user", "content": prompt}])
             results.append({
                 "step": step.get("description", ""),
                 "output": llm_resp.content

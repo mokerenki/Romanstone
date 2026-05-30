@@ -32,7 +32,7 @@ Return ONLY a JSON list of steps in the exact format:
   ...
 ]
 The last step MUST be the final answer step."""
-        resp = await self.router.route("kimi-k2", prompt)
+        resp = await self.router.route("planning", [{"role": "user", "content": prompt}])
         try:
             plan = json.loads(resp.content)
             if not isinstance(plan, list):

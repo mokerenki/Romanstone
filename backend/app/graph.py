@@ -5,7 +5,7 @@ from app.agents.verifier import VerifierNode
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
 
-def create_graph(router: ModelRouter, registry: ToolRegistry):
+def create_graph(router: ModelRouter, registry: ToolRegistry, checkpointer=None):
     graph = StateGraph(dict)
 
     planner = PlannerNode(router, registry)
@@ -26,4 +26,5 @@ def create_graph(router: ModelRouter, registry: ToolRegistry):
             return "planner"
 
     graph.add_conditional_edges("verifier", should_loop)
-    return graph.compile()
+
+    return graph.compile(checkpointer=checkpointer)

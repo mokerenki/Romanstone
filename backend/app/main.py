@@ -72,6 +72,6 @@ from app.api import tasks
 # ---------------------------------------------------------------
 #from app.api import tasks, heartbeat_config, rbac
 
-app.include_router(tasks.router, prefix="/api/v1")
+app.include_router(tasks.router, prefix="/api")
 #app.include_router(heartbeat_config.router, prefix="/api")
 #app.include_router(rbac.router, prefix="/api")
