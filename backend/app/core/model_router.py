@@ -90,20 +90,17 @@ class KimiK2Client(BaseModelClient):
         payload = {
             # IMPORTANT: model is taken from config (set to "kimi-k2.6" in .env)
             "model": self.config.model,
-            "messages": messages,
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
             "messages": payload_messages,
             "stream": False,
         }
-        if system_prompt:
-            payload["messages"].insert(0, {"role": "system", "content": system_prompt})
 
         # Only include parameters if they are explicitly set to avoid 400 Bad Request
         temp = temperature if temperature is not None else self.config.temperature
-        if temp is not None: payload["temperature"] = temp
+        if temp is not None:
+            payload["temperature"] = temp
         max_t = max_tokens if max_tokens is not None else self.config.max_tokens
-        if max_t is not None: payload["max_tokens"] = max_t
+        if max_t is not None:
+            payload["max_tokens"] = max_t
 
         resp = await self._client.post("/chat/completions", json=payload)
         resp.raise_for_status()
@@ -132,19 +129,16 @@ class DeepSeekClient(BaseModelClient):
 
         payload = {
             "model": self.config.model,
-            "messages": messages,
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
             "messages": payload_messages,
             "stream": False,
         }
-        if system_prompt:
-            payload["messages"].insert(0, {"role": "system", "content": system_prompt})
 
         temp = temperature if temperature is not None else self.config.temperature
-        if temp is not None: payload["temperature"] = temp
+        if temp is not None:
+            payload["temperature"] = temp
         max_t = max_tokens if max_tokens is not None else self.config.max_tokens
-        if max_t is not None: payload["max_tokens"] = max_t
+        if max_t is not None:
+            payload["max_tokens"] = max_t
 
         resp = await self._client.post("/chat/completions", json=payload)
         resp.raise_for_status()
