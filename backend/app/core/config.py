@@ -71,8 +71,8 @@ class AetherConfig:
     kimi_k2: ModelConfig = field(default_factory=lambda: ModelConfig(
         provider="kimi",
         api_key=os.getenv("KIMI_API_KEY", "").strip(),
-        base_url=os.getenv("KIMI_BASE_URL", os.getenv("KIMI_K2_BASE_URL", "https://api.moonshot.ai/v1")).strip(),
-        model=os.getenv("KIMI_MODEL", "kimi-k2.6").strip(),
+        base_url=os.getenv("KIMI_BASE_URL", os.getenv("KIMI_K2_BASE_URL", "https://api.moonshot.cn/v1")).strip(),
+        model=os.getenv("KIMI_MODEL", os.getenv("KIMI_K2_MODEL", "kimi-k2.6")).strip(),
         temperature=0.3,
         max_tokens=4096,
         input_cost_per_1m=0.56,

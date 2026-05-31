@@ -5,7 +5,7 @@ Routes planning to Kimi K2.6, verification to DeepSeek.
 All calls traced via Opik with cost attribution.
 
 Kimi model: kimi-k2.6 (OpenAI-compatible endpoint)
-Base URL:   https://api.moonshot.ai/v1   (default from config)
+Base URL:   https://api.moonshot.cn/v1   (default from config)
 DeepSeek:   unchanged
 """
 
@@ -174,6 +174,10 @@ class ModelRouter:
             kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-k2.6")
 
         self._kimi = KimiK2Client(kimi_cfg)
+        logger.info("model_router.kimi_config",
+                    model=kimi_cfg.model,
+                    base_url=kimi_cfg.base_url,
+                    api_key_preview=kimi_cfg.api_key[:8] + "..." if kimi_cfg.api_key else "<empty>")
         self._deepseek = DeepSeekClient(CONFIG.deepseek)
         
         ds_cfg = CONFIG.deepseek

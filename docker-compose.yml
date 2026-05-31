@@ -53,6 +53,9 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       REDIS_URL: redis://redis:6379/0
+      KIMI_K2_MODEL: ${KIMI_K2_MODEL}
+      KIMI_BASE_URL: ${KIMI_BASE_URL}
+      KIMI_MODEL: ${KIMI_MODEL}
       KIMI_API_KEY: ${KIMI_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DATABASE_URL: postgresql+asyncpg://aether:aether@postgres:5432/aether
