@@ -1,14 +1,15 @@
 """
 ModelRouter — Phase 0 (COMPLETE)
 
-Routes planning to Kimi K2.6, verification to DeepSeek.
+Routes planning to Kimi (latest), verification to DeepSeek.
 All calls traced via Opik with cost attribution.
 
-Kimi model: kimi-k2.6 (OpenAI-compatible endpoint)
-Base URL:   https://api.moonshot.cn/v1   (default from config)
+Kimi model: kimi-latest (OpenAI-compatible endpoint)
+Base URL:   https://api.moonshot.ai/v1   (default from config)
 DeepSeek:   unchanged
 """
 
+import asyncio
 import dataclasses
 import time
 from abc import ABC, abstractmethod
@@ -79,32 +80,88 @@ class BaseModelClient(ABC):
 
 
 class KimiK2Client(BaseModelClient):
-    @track(project_name="aether", name="kimi_k26_chat")
+    #@track(project_name="aether", name="kimi_k26_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
-        # Use a copy to avoid mutating the original messages list
-        payload_messages = list(messages)
+        
+        # Build messages list - ensure proper format
+        payload_messages = []
         if system_prompt:
-            payload_messages.insert(0, {"role": "system", "content": system_prompt})
+            payload_messages.append({"role": "system", "content": str(system_prompt)})
+        for msg in messages:
+            payload_messages.append({
+                "role": str(msg.get("role", "user")),
+                "content": str(msg.get("content", ""))
+            })
 
+        # Build payload with correct parameter names and types
         payload = {
-            # IMPORTANT: model is taken from config (set to "kimi-k2.6" in .env)
-            "model": self.config.model,
+            "model": str(self.config.model),
             "messages": payload_messages,
             "stream": False,
         }
 
-        # Only include parameters if they are explicitly set to avoid 400 Bad Request
+        # Add temperature if set (must be between 0 and 2 for Kimi API)
         temp = temperature if temperature is not None else self.config.temperature
         if temp is not None:
-            payload["temperature"] = temp
+            payload["temperature"] = float(max(0.0, min(2.0, temp)))
+        
+        # Add max_tokens if set (must be positive integer)
         max_t = max_tokens if max_tokens is not None else self.config.max_tokens
         if max_t is not None:
-            payload["max_tokens"] = max_t
+            payload["max_tokens"] = int(max(1, min(8192, max_t)))
 
-        resp = await self._client.post("/chat/completions", json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+        # Retry logic with exponential backoff
+        max_retries = 3
+        base_delay = 1.0
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    delay = base_delay * (2 ** (attempt - 1))
+                    logger.info("kimi_k26.retry", attempt=attempt, delay=delay, model=payload["model"])
+                    await asyncio.sleep(delay)
+                
+                resp = await self._client.post("/chat/completions", json=payload)
+                
+                # Log full request for debugging
+                if resp.status_code >= 400:
+                    error_body = resp.text
+                    logger.error("kimi_k26.error", 
+                                status_code=resp.status_code, 
+                                error_body=error_body,
+                                model=payload["model"],
+                                attempt=attempt,
+                                payload_sample=str(payload)[:500])
+                
+                # Handle specific error codes
+                if resp.status_code == 401:
+                    logger.error("kimi_k26.auth_error", 
+                                error_body=resp.text,
+                                api_key_preview=self.config.api_key[:8] + "..." if self.config.api_key else "<empty>")
+                    resp.raise_for_status()
+                elif resp.status_code == 429:
+                    # Rate limit - retry with longer delay
+                    if attempt < max_retries - 1:
+                        continue
+                    resp.raise_for_status()
+                elif resp.status_code >= 400:
+                    resp.raise_for_status()
+                
+                data = resp.json()
+                break
+                
+            except Exception as e:
+                last_error = e
+                if attempt == max_retries - 1:
+                    logger.error("kimi_k26.max_retries_exceeded", 
+                                error=str(e), 
+                                model=payload["model"],
+                                attempts=max_retries)
+                    raise
+                continue
+
         usage = self._parse_usage(data)
         latency = (time.perf_counter() - start) * 1000
 
@@ -120,7 +177,7 @@ class KimiK2Client(BaseModelClient):
 
 
 class DeepSeekClient(BaseModelClient):
-    @track(project_name="aether", name="deepseek_chat")
+    #@track(project_name="aether", name="deepseek_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
         payload_messages = list(messages)
@@ -164,14 +221,13 @@ class ModelRouter:
 
     def __init__(self):
         # -------------------------------------------------------
-        # Ensure the Kimi model is set to kimi-k2.6.
-        # You can override via environment: KIMI_K2_MODEL=kimi-k2.6
+        # Kimi model configuration - uses kimi-latest by default.
+        # You can override via environment: KIMI_MODEL=kimi-latest
         # -------------------------------------------------------
         kimi_cfg = CONFIG.kimi_k2
-        if not kimi_cfg.model or kimi_cfg.model.startswith("kimi-k2-"):
-            # Automatically upgrade old model names to k2.6
-            logger.info("model_router.upgrading_kimi_model", old=kimi_cfg.model, new="kimi-k2.6")
-            kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-k2.6")
+        if not kimi_cfg.model:
+            logger.info("model_router.using_default_kimi_model", model="kimi-latest")
+            kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-latest")
 
         self._kimi = KimiK2Client(kimi_cfg)
         logger.info("model_router.kimi_config",
