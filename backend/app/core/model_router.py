@@ -101,10 +101,8 @@ class KimiK2Client(BaseModelClient):
             "stream": False,
         }
 
-        # Add temperature if set (must be between 0 and 2 for Kimi API)
-        temp = temperature if temperature is not None else self.config.temperature
-        if temp is not None:
-            payload["temperature"] = float(max(0.0, min(2.0, temp)))
+        # Kimi k2.6 model only accepts temperature=1, so we always use 1.0
+        payload["temperature"] = 1.0
         
         # Add max_tokens if set (must be positive integer)
         max_t = max_tokens if max_tokens is not None else self.config.max_tokens

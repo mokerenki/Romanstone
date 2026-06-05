@@ -3,12 +3,14 @@
 REST endpoints for task invocation and WebSocket streaming.
 """
 
+import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -63,7 +65,19 @@ async def create_task(request: Dict[str, Any]):
     }
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "aether"}}
-    final_state = await graph.ainvoke(initial_state, config=config)
+    try:
+        final_state = await graph.ainvoke(initial_state, config=config)
+    except Exception as exc:
+        error_trace = traceback.format_exc()
+        logger.exception("task_execution_failed", error=str(exc), traceback=error_trace)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Task execution failed.",
+                "error": str(exc),
+                "trace": error_trace.splitlines()[-5:],
+            },
+        )
 
     return {
         "task_id": final_state["task_id"],
