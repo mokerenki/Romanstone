@@ -232,13 +232,10 @@ class ModelRouter:
                     model=kimi_cfg.model,
                     base_url=kimi_cfg.base_url,
                     api_key_preview=kimi_cfg.api_key[:8] + "..." if kimi_cfg.api_key else "<empty>")
-        self._deepseek = DeepSeekClient(CONFIG.deepseek)
-        
         ds_cfg = CONFIG.deepseek
         if not ds_cfg.model or "flash" in ds_cfg.model.lower():
             logger.info("model_router.fixing_deepseek_model", old=ds_cfg.model, new="deepseek-chat")
             ds_cfg = dataclasses.replace(ds_cfg, model="deepseek-chat")
-            
         self._deepseek = DeepSeekClient(ds_cfg)
         self._role_map = {
             self.ROLE_PLANNING: self._kimi,

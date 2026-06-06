@@ -7,15 +7,17 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from starlette.websockets import WebSocketDisconnect # Add this import
 
 import structlog
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket # Remove WebSocketDisconnect from here
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
+from app.api.websocket_handler import stream_task_events # Add this import
 
 from app.core.config import CONFIG
 from app.core.model_router import ModelRouter
@@ -54,7 +56,7 @@ async def create_task(request: Dict[str, Any]):
     initial_state = {
         "task_id": task_id,"task": user_message, "user_id": user_id, "tenant_id": tenant_id,
         "messages": [HumanMessage(content=user_message)],
-        "plan": [], "current_step_index": 0, "tool_calls": [],
+        "plan": [], "current_step": 0, "tool_calls": [],
         "verification": None, "needs_replan": False, "final_answer": None,
         "status": "pending", "cost_metrics": {
             "kimi_input_tokens": 0, "kimi_output_tokens": 0,
@@ -97,11 +99,20 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         while True:
             data = await websocket.receive_json()
             if data.get("action") == "run_task":
-                # TODO: Stream graph.astream() events
-                await websocket.send_json({"type": "task_start", "message": data.get("message", "")})
-                # Streaming implementation would go here
-                await websocket.send_json({"type": "task_complete"})
+                user_message = data.get("message", "")
+                user_id = data.get("user_id", "anonymous")
+                tenant_id = data.get("tenant_id", "default")
+                thread_id = data.get("thread_id") or str(uuid.uuid4())
+
+                async for event in stream_task_events(
+                    user_message, user_id, tenant_id, thread_id,
+                    _checkpointer, _router, _registry
+                ):
+                    await websocket.send_json(event)
             elif data.get("action") == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
         logger.info("websocket.disconnected", client_id=client_id)
+    except Exception as e:
+        logger.exception("websocket_error", client_id=client_id, error=str(e))
+        await websocket.send_json({"type": "error", "message": str(e)})
