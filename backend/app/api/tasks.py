@@ -1,8 +1,3 @@
-"""Tasks API — Phase 0 (COMPLETE)
-
-REST endpoints for task invocation and WebSocket streaming.
-"""
-
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -22,9 +17,15 @@ from app.api.websocket_handler import stream_task_events # Add this import
 from app.core.config import CONFIG
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
+from app.graph import create_graph
+
+from app.memory.cognee_setup import CogneeMemory
+from app.memory.retriever_tool import MemoryRetrieverTool
 
 logger = structlog.get_logger("aether.api")
 router = APIRouter()
+
+redis_client: Optional[aioredis.Redis] = None
 
 # Lazy init (replace with Postgres checkpointer in production)
 _checkpointer = MemorySaver()
@@ -33,6 +34,48 @@ _registry = ToolRegistry()  # TODO: populate with actual tools
 _registry.register(BrowserTool())
 _registry.register(PythonREPLTool())
 
+
+redis_client: Optional[aioredis.Redis] = None
+
+async def get_redis_client() -> aioredis.Redis:
+    """Provides a globally managed Redis client instance."""
+    if redis_client is None:
+        # This should ideally be initialized via FastAPI lifespan events
+        # For standalone testing, you might initialize here, but not recommended for production
+        logger.warning("redis_client.not_initialized_via_lifespan", message="Initializing Redis client directly. Ensure this is managed by FastAPI lifespan in production.")
+        return await aioredis.from_url("redis://localhost:6379")
+    return redis_client
+
+async def create_proactive_task_to_queue(task_description: str, context: str = "", user_id: str = "heartbeat", tenant_id: str = "default", priority: str = "medium", action_type: str = "proactive_monitoring") -> Dict[str, Any]:
+    """Creates a proactive task and dispatches it to a Redis Stream for asynchronous processing by a worker."""
+    task_id = str(uuid.uuid4())
+    thread_id = str(uuid.uuid4()) # Each proactive task gets its own thread for isolation
+    now = datetime.now(timezone.utc).isoformat()
+
+    logger.info("proactive_task.creating_and_queuing", task_id=task_id, task_description=task_description, priority=priority)
+
+    task_payload = {
+        "task_id": task_id,
+        "thread_id": thread_id,
+        "task_description": task_description,
+        "context": context,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "priority": priority,
+        "action_type": action_type,
+        "timestamp": now,
+    }
+
+    try:
+        redis = await get_redis_client()
+        # Push task to a Redis Stream. The 'payload' field contains the JSON serialized task.
+        await redis.xadd("proactive_tasks_stream", {"payload": json.dumps(task_payload).encode("utf-8")})
+        logger.info("proactive_task.dispatched_to_redis_stream", task_id=task_id, stream="proactive_tasks_stream")
+        return {"status": "dispatched_to_queue", "task_id": task_id}
+    except Exception as exc:
+        error_trace = traceback.format_exc()
+        logger.error("proactive_task.dispatch_failed_redis", task_id=task_id, error=str(exc), traceback=error_trace, exc_info=True)
+        raise
 
 @router.get("/health")
 async def health():
@@ -116,3 +159,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except Exception as e:
         logger.exception("websocket_error", client_id=client_id, error=str(e))
         await websocket.send_json({"type": "error", "message": str(e)})
+
+        _cognee_memory = CogneeMemory(config={
+    "kuzu_db_path": os.environ.get("KUZU_DB_PATH_API", "/tmp/aether_api/kuzu.db"),
+    "qdrant_host": os.environ.get("QDRANT_HOST", "localhost"),
+    "qdrant_port": int(os.environ.get("QDRANT_PORT", 6333)),
+    "openai_api_key": os.environ.get("OPENAI_API_KEY"),
+    "openai_api_base": os.environ.get("OPENAI_API_BASE"),
+})
+
+_registry.register(BrowserTool())
+_registry.register(PythonREPLTool())
+_registry.register(MemoryRetrieverTool(_cognee_memory)) # Register the new tool

@@ -1,49 +1,83 @@
-"""Legal Schema — Phase 1 (SCAFFOLD)
-
-Vertical knowledge graph schema for South African legal practice.
-10–15 entity types, domain-aware out of the box.
-"""
-
 LEGAL_SCHEMA = {
     "entities": {
         "Case": {
-            "properties": ["case_number", "court", "judge", "parties", "status", "filing_date"],
+            "properties": {
+                "case_number": "STRING",
+                "title": "STRING",
+                "status": "STRING",
+                "jurisdiction": "STRING",
+                "filing_date": "STRING", # ISO date string
+            },
             "relationships": {
-                "heard_at": "Court",
-                "involves": "Client",
-                "has_document": "Document",
-                "subject_to": "Regulation"
+                "HAS_PARTY": {"target_type": "Party", "properties": {"role": "STRING"}},
+                "HAS_DOCUMENT": {"target_type": "Document", "properties": {"relation_type": "STRING"}},
+                "RELATES_TO_LAW": {"target_type": "Law", "properties": {}},
             }
         },
-        "Court": {
-            "properties": ["name", "jurisdiction", "rules", "filing_deadlines"],
-            "relationships": {}
-        },
-        "Judgment": {
-            "properties": ["citations", "legal_principles", "outcomes", "date"],
+        "Party": {
+            "properties": {
+                "name": "STRING",
+                "type": "STRING", # e.g., "Plaintiff", "Defendant", "Witness"
+                "organization": "STRING",
+            },
             "relationships": {
-                "overturns": "Case",
-                "cites": "Judgment"
+                "REPRESENTS": {"target_type": "Party", "properties": {}},
+                "HAS_CONTACT": {"target_type": "ContactInfo", "properties": {}},
             }
-        },
-        "Client": {
-            "properties": ["contact_details", "matter_history", "billing_status"],
-            "relationships": {}
         },
         "Document": {
-            "properties": ["type", "filing_date", "content_hash", "status"],
+            "properties": {
+                "document_id": "STRING",
+                "title": "STRING",
+                "type": "STRING", # e.g., "Complaint", "Contract", "Medical Record"
+                "author": "STRING",
+                "creation_date": "STRING",
+                "summary": "STRING",
+            },
             "relationships": {
-                "belongs_to": "Case"
+                "REFERENCES": {"target_type": "Document", "properties": {}},
+                "MENTIONS": {"target_type": "Person", "properties": {}},
             }
         },
-        "Regulation": {
-            "properties": ["act_name", "sections", "compliance_deadlines"],
+        "Law": {
+            "properties": {
+                "law_id": "STRING",
+                "name": "STRING",
+                "jurisdiction": "STRING",
+                "effective_date": "STRING",
+            },
             "relationships": {
-                "applies_to": "Case"
+                "AMENDS": {"target_type": "Law", "properties": {}},
             }
-        }
-    },
-    "indexes": ["Case.case_number", "Court.name", "Document.content_hash"]
+        },
+        "Person": {
+            "properties": {
+                "name": "STRING",
+                "date_of_birth": "STRING",
+                "gender": "STRING",
+            },
+            "relationships": {
+                "WORKS_FOR": {"target_type": "Organization", "properties": {}},
+            }
+        },
+        "Organization": {
+            "properties": {
+                "name": "STRING",
+                "type": "STRING",
+            },
+            "relationships": {
+                "HAS_OFFICE": {"target_type": "Location", "properties": {}},
+            }
+        },
+        "Location": {
+            "properties": {
+                "address": "STRING",
+                "city": "STRING",
+                "state": "STRING",
+                "zip_code": "STRING",
+            },
+            "relationships": {}
+        },
+        # Add more entities as needed for procurements, healthcare, personal assistance
+    }
 }
-
-# TODO: Add schema validation, entity extraction prompts, relationship inference rules.
