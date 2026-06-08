@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 import structlog
 import uuid
 import os
+import traceback
+from typing import Any, Dict, Optional
+from langchain_core.messages import HumanMessage
 
 # Import necessary components for the agent loop
 from app.graph import create_graph
@@ -76,7 +79,7 @@ class ProactiveTaskWorker:
                 raise # Re-raise if it's not just a busy group error
             logger.info("proactive_task_worker.consumer_group_exists", group=self.consumer_group)
 
-        asyncio.create_task(self._listen_for_tasks())
+        await self._listen_for_tasks()
         logger.info("proactive_task_worker.started_listening", consumer_name=self.consumer_name)
 
     async def stop(self):
@@ -135,7 +138,7 @@ class ProactiveTaskWorker:
             "task": task_description,
             "user_id": user_id,
             "tenant_id": tenant_id,
-            "messages": [{"role": "user", "content": f"{task_description}\n\nContext: {context}"}],
+            "messages": [HumanMessage(content=f"{task_description}\n\nContext: {context}")],
             "plan": [], "current_step": 0, "tool_calls": [],
             "verification": None, "needs_replan": False, "final_answer": None,
             "status": "pending", "cost_metrics": {

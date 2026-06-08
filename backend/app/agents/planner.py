@@ -1,4 +1,5 @@
 import json
+from langchain_core.messages import HumanMessage
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
 
@@ -32,7 +33,7 @@ Return ONLY a JSON list of steps in the exact format:
   ...
 ]
 The last step MUST be the final answer step."""
-        resp = await self.router.route("planning", [{"role": "user", "content": prompt}])
+        resp = await self.router.route("planning", [HumanMessage(content=prompt)])
         try:
             plan = json.loads(resp.content)
             if not isinstance(plan, list):

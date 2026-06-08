@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import YAML from 'js-yaml'; // npm install js-yaml
-import { CodeMirror, basicSetup } from '@codemirror/basic-setup'; // npm install @codemirror/basic-setup
+import { CodeMirror, basicSetup } from '@uiw/react-codemirror'; // npm install @uiw/react-codemirror  
 import { yaml } from '@codemirror/lang-yaml'; // npm install @codemirror/lang-yaml
 
 // Define a basic schema for validation (can be more detailed)
@@ -24,6 +24,7 @@ interface HeartbeatConfig {
   probes: { [key: string]: any };
   policy_rules: any[];
   authorized_actions?: string[];
+  _rawYaml?: string;
 }
 
 interface HeartbeatStatus {

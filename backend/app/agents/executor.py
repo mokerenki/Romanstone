@@ -1,3 +1,4 @@
+from langchain_core.messages import HumanMessage
 from app.tools.registry import ToolRegistry
 from app.core.model_router import ModelRouter
 
@@ -41,7 +42,7 @@ User's original task: {state['task']}
 If this is a final answer, write a clear, complete, and concise paragraph that directly answers the user. Do not include raw JSON or tool outputs. Use proper grammar."""
             llm_resp = await self.router.route(
                 self.router.ROLE_VERIFICATION,
-                [{"role": "user", "content": prompt}]
+                [HumanMessage(content=prompt)]
             )
             results.append({
                 "step": step.get("description", ""),

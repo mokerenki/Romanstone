@@ -141,7 +141,7 @@ class CogneeMemory:
         ```
 
         Text to analyze:
-        """{text}"""
+        f"""{text}"""
 
         Output your response as a JSON object with two keys: "entities" (a list of objects, each with "type", "id", and "properties") and "relationships" (a list of objects, each with "type", "source_id", "target_id", and "properties").
         For entity IDs, use a stable identifier from the text if available (e.g., case number, document ID), otherwise generate a UUID. Ensure IDs are unique within their type.

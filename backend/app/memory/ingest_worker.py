@@ -3,6 +3,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+import traceback
 import structlog
 import aioredis
 import os
@@ -58,7 +59,7 @@ class MemoryIngestWorker:
                 raise
             logger.info("memory_ingest_worker.consumer_group_exists", group=self.consumer_group)
 
-        asyncio.create_task(self._listen_for_events())
+        await self._listen_for_tasks()
         logger.info("memory_ingest_worker.started_listening", consumer_name=self.consumer_name)
 
     async def stop(self):

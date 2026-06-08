@@ -1,6 +1,8 @@
 import kuzu
 from typing import Any, Dict, List, Optional
 import structlog
+import os
+import json
 
 from app.memory.legal_schema import LEGAL_SCHEMA
 

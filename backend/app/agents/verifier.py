@@ -1,3 +1,4 @@
+from langchain_core.messages import HumanMessage
 from app.core.model_router import ModelRouter
 
 class VerifierNode:
@@ -20,7 +21,7 @@ Final answer to verify: "{last_output}"
 
 Is this answer complete, self-contained, grammatically correct, and directly responsive to the user?
 Answer only 'yes' or 'no'. If 'no', briefly explain what is missing."""
-        resp = await self.router.route("verification", [{"role": "user", "content": prompt}])
+        resp = await self.router.route("verification", [HumanMessage(content=prompt)])
         answer_text = resp.content.strip().lower()
         if "yes" in answer_text and "no" not in answer_text:
             state["done"] = True
