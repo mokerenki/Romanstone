@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     logger.info("app.startup")
     
     # Initialize Redis client for API routes (e.g., for create_proactive_task_to_queue)
-    tasks.redis_client = await aioredis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"))
+    tasks.redis_client = await aioredis.from_url(os.environ.get("REDIS_URL", "redis://redis:6379/0"))
     logger.info("redis.client_initialized")
 
     if tasks._cognee_memory.kuzu_graph:

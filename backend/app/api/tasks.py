@@ -43,7 +43,7 @@ async def get_redis_client() -> aioredis.Redis:
         # This should ideally be initialized via FastAPI lifespan events
         # For standalone testing, you might initialize here, but not recommended for production
         logger.warning("redis_client.not_initialized_via_lifespan", message="Initializing Redis client directly. Ensure this is managed by FastAPI lifespan in production.")
-        return await aioredis.from_url("redis://localhost:6379")
+        return await aioredis.from_url("redis://redis:6379/0")
     return redis_client
 
 async def create_proactive_task_to_queue(task_description: str, context: str = "", user_id: str = "heartbeat", tenant_id: str = "default", priority: str = "medium", action_type: str = "proactive_monitoring") -> Dict[str, Any]:

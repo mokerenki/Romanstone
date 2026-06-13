@@ -37,7 +37,19 @@ The last step MUST be the final answer step."""
         try:
             plan = json.loads(resp.content)
             if not isinstance(plan, list):
-                plan = [{"action": task}]
+                raise ValueError("planning response not a list")
         except Exception:
-            plan = [{"action": task}]
-        return {**state, "plan": plan, "current_step": 0}
+            plan = [{"action": task, "tool": "", "args": {}, "description": task}]
+        sanitized_plan = []
+        for item in plan:
+            if not isinstance(item, dict):
+                item = {"action": str(item), "tool": "", "args": {}, "description": str(item)}
+            sanitized_plan.append({
+                "action": item.get("action", task),
+                "tool": item.get("tool", ""),
+                "args": item.get("args", {}),
+                "description": item.get("description", item.get("action", task)),
+                **{k: v for k, v in item.items() if k not in {"action", "tool", "args", "description"}}
+            })
+
+        return {**state, "plan": sanitized_plan, "current_step": 0}
