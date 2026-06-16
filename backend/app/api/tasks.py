@@ -1,18 +1,21 @@
+import json
+import os
 import traceback
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from starlette.websockets import WebSocketDisconnect # Add this import
+from starlette.websockets import WebSocketDisconnect
 
+import aioredis
 import structlog
-from fastapi import APIRouter, Depends, WebSocket # Remove WebSocketDisconnect from here
+from fastapi import APIRouter, WebSocket
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
-from app.api.websocket_handler import stream_task_events # Add this import
+from app.api.websocket_handler import stream_task_events
 
 from app.core.config import CONFIG
 from app.core.model_router import ModelRouter
@@ -34,8 +37,16 @@ _registry = ToolRegistry()  # TODO: populate with actual tools
 _registry.register(BrowserTool())
 _registry.register(PythonREPLTool())
 
+_cognee_memory = CogneeMemory(config={
+    "kuzu_db_path": os.environ.get("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
+    "qdrant_host": os.environ.get("QDRANT_HOST", "localhost"),
+    "qdrant_port": int(os.environ.get("QDRANT_PORT", "6333")),
+    "openai_api_key": os.environ.get("OPENAI_API_KEY"),
+    "openai_api_base": os.environ.get("OPENAI_API_BASE"),
+})
 
-redis_client: Optional[aioredis.Redis] = None
+_memory_retriever_tool = MemoryRetrieverTool(_cognee_memory)
+_registry.register(_memory_retriever_tool)
 
 async def get_redis_client() -> aioredis.Redis:
     """Provides a globally managed Redis client instance."""
@@ -134,6 +145,33 @@ async def create_task(request: Dict[str, Any]):
     }
 
 
+@router.post("/agent/tools/memory_retriever")
+async def memory_retriever(request: Dict[str, Any]):
+    mode = request.get("mode")
+    query = request.get("query")
+    entity_label = request.get("entity_label")
+    entity_id = request.get("entity_id")
+    query_time = request.get("query_time")
+    top_k = request.get("top_k", 5)
+
+    if not mode or not query:
+        return JSONResponse(status_code=400, content={"error": "Both 'mode' and 'query' are required."})
+
+    try:
+        result = await _memory_retriever_tool.execute(
+            mode=mode,
+            query=query,
+            entity_label=entity_label,
+            entity_id=entity_id,
+            query_time=query_time,
+            top_k=int(top_k) if top_k is not None else 5,
+        )
+        return result
+    except Exception as exc:
+        logger.exception("memory_retriever.failed", error=str(exc))
+        return JSONResponse(status_code=500, content={"error": "Memory retrieval failed.", "details": str(exc)})
+
+
 @router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
@@ -159,15 +197,3 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except Exception as e:
         logger.exception("websocket_error", client_id=client_id, error=str(e))
         await websocket.send_json({"type": "error", "message": str(e)})
-
-        _cognee_memory = CogneeMemory(config={
-    "kuzu_db_path": os.environ.get("KUZU_DB_PATH_API", "/tmp/aether_api/kuzu.db"),
-    "qdrant_host": os.environ.get("QDRANT_HOST", "localhost"),
-    "qdrant_port": int(os.environ.get("QDRANT_PORT", 6333)),
-    "openai_api_key": os.environ.get("OPENAI_API_KEY"),
-    "openai_api_base": os.environ.get("OPENAI_API_BASE"),
-})
-
-_registry.register(BrowserTool())
-_registry.register(PythonREPLTool())
-_registry.register(MemoryRetrieverTool(_cognee_memory)) # Register the new tool

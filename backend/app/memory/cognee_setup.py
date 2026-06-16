@@ -141,13 +141,13 @@ class CogneeMemory:
         ```
 
         Text to analyze:
-        f"""{text}"""
+        {text}
 
         Output your response as a JSON object with two keys: "entities" (a list of objects, each with "type", "id", and "properties") and "relationships" (a list of objects, each with "type", "source_id", "target_id", and "properties").
         For entity IDs, use a stable identifier from the text if available (e.g., case number, document ID), otherwise generate a UUID. Ensure IDs are unique within their type.
         Example Entity: {{
-        "type": "Case", "id": "CASE-2023-001", "properties": {"case_number": "CASE-2023-001", "status": "Open"}}
-        Example Relationship: {"type": "HAS_DOCUMENT", "source_id": "CASE-2023-001", "target_id": "DOC-456", "properties": {"filed_date": "2023-01-15"}}
+        "type": "Case", "id": "CASE-2023-001", "properties": {{"case_number": "CASE-2023-001", "status": "Open"}}}}
+        Example Relationship: {{"type": "HAS_DOCUMENT", "source_id": "CASE-2023-001", "target_id": "DOC-456", "properties": {{"filed_date": "2023-01-15"}}}}
         """
 
         try:
@@ -233,7 +233,7 @@ class CogneeMemory:
         return None
 
     async def search(self, query: str, mode: str = "semantic", top_k: int = 5, 
-                     entity_id: Optional[str] = None, property_name: Optional[str] = None, 
+                     entity_label: Optional[str] = None, entity_id: Optional[str] = None, property_name: Optional[str] = None, 
                      query_time: Optional[datetime] = None) -> Dict[str, Any]:
         """Performs semantic, graph, or temporal memory retrieval."""
         if not self._initialized:
@@ -268,8 +268,15 @@ class CogneeMemory:
                 raise ValueError("KuzuGraph not initialized for temporal query.")
             
             temporal_graph = TemporalGraph(self.kuzu_graph) # Instantiate TemporalGraph with initialized KuzuGraph
-            result = await temporal_graph.query_at_time(entity_id, property_name, query_time)
-            return {"mode": "temporal", "entity_id": entity_id, "property_name": property_name, "query_time": query_time.isoformat(), "result": result}
+            result = await temporal_graph.query_at_time(entity_id, property_name, query_time, entity_label=entity_label)
+            return {
+                "mode": "temporal",
+                "entity_label": entity_label,
+                "entity_id": entity_id,
+                "property_name": property_name,
+                "query_time": query_time.isoformat(),
+                "result": result,
+            }
         
         else:
             raise ValueError(f"Unsupported memory retrieval mode: {mode}")

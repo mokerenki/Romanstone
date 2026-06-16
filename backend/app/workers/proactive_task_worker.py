@@ -42,9 +42,8 @@ class ProactiveTaskWorker:
         self.tool_registry.register(PythonREPLTool())
 
         # Initialize memory components for the worker
-        # KuzuDB path should be unique per worker if not using a shared/networked DB
-        # For production, KuzuDB might be on a shared volume or a remote instance
-        kuzu_db_path = os.environ.get("KUZU_DB_PATH", f"/tmp/aether_worker_{self.consumer_name}/kuzu.db")
+        # Use the shared KuzuDB path when available.
+        kuzu_db_path = os.environ.get("KUZU_DB_PATH", "/tmp/aether/kuzu.db")
         self.kuzu_graph = KuzuGraph(db_path=kuzu_db_path)
         self.cognee_memory = CogneeMemory(config={"kuzu_db_path": kuzu_db_path})
         self.tool_registry.register(MemoryRetrieverTool(self.cognee_memory))

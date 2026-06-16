@@ -37,7 +37,7 @@ async def stream_task_events(
         "tenant_id": tenant_id,
         "messages": [HumanMessage(content=user_message)],
         "plan": [],
-        "current_step_index": 0, # Ensure this matches what executor.py expects
+        "current_step": 0, # Ensure this matches what executor.py expects
         "results": [],
         "tool_calls": [],
         "verification": None,

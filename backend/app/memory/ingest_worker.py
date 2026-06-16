@@ -37,9 +37,9 @@ class MemoryIngestWorker:
         self._running = True
         self.redis_client = await aioredis.from_url(self.redis_url)
         
-        # Initialize CogneeMemory for this worker instance
-        # KuzuDB path should be unique per worker if not using a shared/networked DB
-        kuzu_db_path = os.environ.get("KUZU_DB_PATH_INGEST", f"/tmp/aether_ingest_worker_{self.consumer_name}/kuzu.db")
+        # Initialize CogneeMemory for this worker instance.
+        # Use a shared KuzuDB path for all backend processes by default.
+        kuzu_db_path = os.environ.get("KUZU_DB_PATH", "/tmp/aether/kuzu.db")
         self.cognee_memory = CogneeMemory(config={
             "kuzu_db_path": kuzu_db_path,
             "qdrant_host": os.environ.get("QDRANT_HOST", "localhost"),
@@ -59,7 +59,7 @@ class MemoryIngestWorker:
                 raise
             logger.info("memory_ingest_worker.consumer_group_exists", group=self.consumer_group)
 
-        await self._listen_for_tasks()
+        await self._listen_for_events()
         logger.info("memory_ingest_worker.started_listening", consumer_name=self.consumer_name)
 
     async def stop(self):

@@ -13,6 +13,24 @@ class TemporalGraph:
         self.kuzu_graph = kuzu_graph
         logger.info("temporal_graph.initialized")
 
+    def _infer_entity_label(self, entity_id: str) -> Optional[str]:
+        """Infer the entity label from KuzuDB if it is not explicitly provided."""
+        if not self.kuzu_graph.conn:
+            self.kuzu_graph.initialize()
+
+        try:
+            # Query node labels for the entity ID
+            query = f"MATCH (n) WHERE n.id = '{entity_id}' RETURN labels(n) AS labels"
+            results = self.kuzu_graph.query(query)
+            if results and len(results) > 0:
+                labels = results[0].get("labels")
+                if isinstance(labels, list) and labels:
+                    return labels[0]
+            logger.warning("temporal_graph.label_inference_failed", entity_id=entity_id)
+        except Exception as e:
+            logger.warning("temporal_graph.label_inference_error", entity_id=entity_id, error=str(e), exc_info=True)
+        return None
+
     async def add_temporal_property(self, entity_label: str, entity_id: str, property_name: str, value: Any, 
                                     valid_from: Optional[datetime] = None, valid_to: Optional[datetime] = None):
         """Adds or updates a property on an entity with temporal validity."""
@@ -48,8 +66,13 @@ class TemporalGraph:
         self.kuzu_graph.add_node(entity_label, updated_properties)
         logger.info("temporal_graph.temporal_property_added", entity_id=entity_id, property=property_name, value=value, valid_from=valid_from_iso, valid_to=valid_to_iso)
 
-    async def query_at_time(self, entity_label: str, entity_id: str, property_name: str, query_time: datetime) -> Any:
+    async def query_at_time(self, entity_id: str, property_name: str, query_time: datetime, entity_label: Optional[str] = None) -> Any:
         """Retrieves the value of a property for an entity that was valid at a specific time."""
+        if not entity_label:
+            entity_label = self._infer_entity_label(entity_id)
+            if not entity_label:
+                raise ValueError("entity_label is required for temporal queries and could not be inferred from entity_id.")
+
         if not self.kuzu_graph.conn:
             self.kuzu_graph.initialize()
 
