@@ -32,7 +32,7 @@ browser-use>=0.1.0
 playwright>=1.48.0
 
 # ── Observability ────────────────────────────────────────────
-opik>=1.0.0
+opik==2.0.63
 
 # ── Security (Phase 2) ─────────────────────────────────────────
 python-jose[cryptography]>=3.3.0
@@ -40,7 +40,7 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.12
 
 # ── Kubernetes & Sandboxing (Phase 2) ────────────────────────
-kubernetes>=31.0.0
+kubernetes==36.0.2
 grpcio>=1.68.0
 grpcio-tools>=1.68.0
 
@@ -48,3 +48,5 @@ grpcio-tools>=1.68.0
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
 pytest-cov>=6.0.0
+redis>=8.0.0
+apscheduler>=3.11.2
