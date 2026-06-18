@@ -47,9 +47,11 @@ class MemoryRetrieverTool(BaseTool):
                 except ValueError:
                     raise ValueError("Invalid query_time format. Must be ISO 8601 string (e.g., 2023-10-27T10:00:00Z).")
                 
-                # For temporal mode, the 'query' parameter is used as 'property_name'
+                # For temporal mode, the frontend 'Property Name' field is submitted as the
+                # tool's 'query' parameter. Here we map that to the underlying
+                # CogneeMemory temporal search 'property_name'.
                 return await self.cognee_memory.search(
-                    query=query, # This is the property_name for temporal search
+                    query=query, # property_name in temporal mode
                     mode="temporal", 
                     entity_label=entity_label,
                     entity_id=entity_id, 
@@ -59,4 +61,4 @@ class MemoryRetrieverTool(BaseTool):
                 raise ValueError(f"Unsupported memory retrieval mode: {mode}")
         except Exception as e:
             logger.error("memory_retriever_tool.execution_failed", mode=mode, query=query, error=str(e), exc_info=True)
-            return {"status": "error", "message": f"Failed to retrieve memory: {str(e)}"}
+            raise

@@ -141,7 +141,9 @@ export default function MemoryExplorerPage() {
         </div>
 
         <div>
-          <label className="block text-gray-300 text-sm font-bold mb-2">Query:</label>
+          <label className="block text-gray-300 text-sm font-bold mb-2">
+            {queryMode === 'temporal' ? 'Property Name:' : 'Query:'}
+          </label>
           <Controller
             name="query"
             control={control}
