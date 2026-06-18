@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import structlog
+import os
 
 # Qdrant Client
 from qdrant_client import QdrantClient, models
@@ -61,8 +62,8 @@ class CogneeMemory:
 
             # Initialize OpenAI Client (for embeddings and entity extraction)
             self.openai_client = AsyncOpenAI(
-                api_key=os.environ.get("OPENAI_API_KEY"),
-                base_url=os.environ.get("OPENAI_API_BASE") # Use custom base_url if configured
+                api_key=os.environ.get("KIMI_K2_MODEL"),
+                base_url=os.environ.get("KIMI_BASE_URL") # Use custom base_url if configured
             )
             logger.info("openai.client_initialized")
 

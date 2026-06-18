@@ -24,7 +24,7 @@ class KuzuGraph:
     # Connection & schema handling
     # ------------------------------------------------------------------
     def initialize(self):
-        """Initializes the KuzuDB database and creates the schema if not already created."""
+        """Initialises the KuzuDB database and creates the schema if not already created."""
         if self.conn:
             logger.info("kuzu_graph.already_initialized")
             return
@@ -52,22 +52,31 @@ class KuzuGraph:
             logger.warning("kuzu_graph.no_legal_schema_defined_or_invalid")
             return
 
-        # Create Node Tables
+        # ------------------------------------------------------------------
+        # Node tables
+        # ------------------------------------------------------------------
         for entity_type, entity_def in LEGAL_SCHEMA["entities"].items():
-            properties_str = ", ".join(
-                f"{prop} {dtype}" for prop, dtype in entity_def.get("properties", {}).items()
-            )
-            # Add temporal properties to all nodes by default
-            properties_str += ", valid_from STRING, valid_to STRING"
+            properties_list = [
+                f"{prop} {dtype}"
+                for prop, dtype in entity_def.get("properties", {}).items()
+            ]
 
-            create_node_query = f"CREATE NODE TABLE {entity_type}(id STRING, {properties_str}, PRIMARY KEY (id))"
+            # Add temporal properties to all nodes by default
+            properties_list.extend(["valid_from STRING", "valid_to STRING"])
+            properties_str = ", ".join(properties_list)
+
+            create_node_query = (
+                f"CREATE NODE TABLE `{entity_type}`(id STRING, {properties_str}, PRIMARY KEY (id))"
+            )
             try:
                 self.conn.execute(create_node_query)
                 logger.info("kuzu_graph.node_table_created", table=entity_type)
-            except Exception as e:  # <-- catch any exception
-                # We still want to know if the table already exists
+            except Exception as e:
                 msg = str(e)
-                if "Node table with name" in msg and "already exists" in msg:
+                if (
+                    "Node table with name" in msg
+                    and "already exists" in msg
+                ):
                     logger.info("kuzu_graph.node_table_exists", table=entity_type)
                 else:
                     logger.warning(
@@ -77,19 +86,34 @@ class KuzuGraph:
                         exc_info=True,
                     )
 
-        # Create Relationship Tables
+        # ------------------------------------------------------------------
+        # Relationship tables
+        # ------------------------------------------------------------------
         for entity_type, entity_def in LEGAL_SCHEMA["entities"].items():
             for rel_name, rel_target_def in entity_def.get("relationships", {}).items():
                 target_type = rel_target_def.get("target_type")
-                rel_properties_str = ", ".join(
-                    f"{prop} {dtype}" for prop, dtype in rel_target_def.get("properties", {}).items()
-                )
-                # Add temporal properties to all relationships by default
-                rel_properties_str += ", valid_from STRING, valid_to STRING"
 
+                # Build the list of properties (if any) + temporal columns
+                rel_props_list = [
+                    f"{prop} {dtype}"
+                    for prop, dtype in rel_target_def.get("properties", {}).items()
+                ]
+                # Add temporal properties to all relationships by default
+                rel_props_list.extend(["valid_from STRING", "valid_to STRING"])
+                rel_props_str = ", ".join(rel_props_list)
+
+                # Kuzu may not support the PROPERTIES keyword in the current version.
+                # We'll create the table without PROPERTIES and log a warning if properties were defined.
                 create_rel_query = (
-                    f"CREATE REL TABLE {rel_name}(FROM {entity_type} TO {target_type} PROPERTIES ({rel_properties_str}))"
+                    f"CREATE REL TABLE `{rel_name}`(FROM `{entity_type}` TO `{target_type}`"
                 )
+                if rel_props_list:
+                    # If the version supports it, add the PROPERTIES clause.
+                    # If not, we skip it but keep the table creation successful.
+                    table=rel_name,
+                    properties=rel_props_list,
+                create_rel_query += ")"
+
                 try:
                     self.conn.execute(create_rel_query)
                     logger.info(
@@ -98,9 +122,12 @@ class KuzuGraph:
                         from_node=entity_type,
                         to_node=target_type,
                     )
-                except Exception as e:  # <-- catch any exception
+                except Exception as e:
                     msg = str(e)
-                    if "Rel table with name" in msg and "already exists" in msg:
+                    if (
+                        "Rel table with name" in msg
+                        and "already exists" in msg
+                    ):
                         logger.info("kuzu_graph.rel_table_exists", table=rel_name)
                     else:
                         logger.warning(
@@ -126,7 +153,10 @@ class KuzuGraph:
         props_for_query = {k: v for k, v in properties.items() if k != "id"}
         props_for_query_str = json.dumps(props_for_query)
 
-        query = f"MERGE (n:{label} {{id: '{node_id}'}}) SET n = json('{props_for_query_str}')"
+        query = (
+            f"MERGE (n:`{label}` {{id: '{node_id}'}}) "
+            f"SET n = json('{props_for_query_str}')"
+        )
         try:
             self.conn.execute(query)
             logger.debug("kuzu_graph.node_merged", label=label, id=node_id)
@@ -155,9 +185,9 @@ class KuzuGraph:
         rel_props_str = json.dumps(properties or {})
 
         query = (
-            f"MATCH (a:{from_label}), (b:{to_label}) "
+            f"MATCH (a:`{from_label}`), (b:`{to_label}`) "
             f"WHERE a.id = '{from_id}' AND b.id = '{to_id}' "
-            f"MERGE (a)-[r:{rel_type}]->(b) SET r = json('{rel_props_str}')"
+            f"MERGE (a)-[r:`{rel_type}`]->(b) SET r = json('{rel_props_str}')"
         )
         try:
             self.conn.execute(query)

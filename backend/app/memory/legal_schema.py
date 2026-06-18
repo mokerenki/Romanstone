@@ -78,6 +78,15 @@ LEGAL_SCHEMA = {
             },
             "relationships": {}
         },
+        "ContactInfo": {
+            "properties": {
+                "phone_number": "STRING",
+                "email": "STRING", # e.g., "Plaintiff", "Defendant", "Witness"
+                "address": "STRING",
+            },
+            "relationships": {
+            }
+        },
         # Add more entities as needed for procurements, healthcare, personal assistance
     }
 }
