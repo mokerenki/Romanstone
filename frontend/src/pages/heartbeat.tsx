@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import YAML from 'js-yaml'; // npm install js-yaml
-import { CodeMirror, basicSetup } from '@uiw/react-codemirror'; // npm install @uiw/react-codemirror  
+import CodeMirror, { basicSetup } from '@uiw/react-codemirror'; // npm install @uiw/react-codemirror  
 import { yaml } from '@codemirror/lang-yaml'; // npm install @codemirror/lang-yaml
 
 // Define a basic schema for validation (can be more detailed)
@@ -149,7 +149,7 @@ export default function HeartbeatPage() {
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
         <h2 className="text-xl font-semibold mb-4 text-white">Configuration Editor</h2>
         {error && <div className="text-red-500 mb-4">Error: {error}</div>}
-        
+
         <form onSubmit={handleSubmit(handleSave)}>
           <div className="mb-4">
             <label htmlFor="config-editor" className="block text-gray-300 text-sm font-bold mb-2">Edit YAML Configuration:</label>
@@ -160,7 +160,7 @@ export default function HeartbeatPage() {
                 <CodeMirror
                   value={configYaml}
                   height="400px"
-                  extensions={[basicSetup, yaml()]}
+                  extensions={[basicSetup(), yaml()]}
                   onChange={onYamlChange}
                   theme="dark"
                 />

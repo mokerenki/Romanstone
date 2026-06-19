@@ -1,9 +1,11 @@
 from langgraph.graph import StateGraph, END
+from langchain_core.load import dumps
 from app.agents.planner import PlannerNode
 from app.agents.executor import ExecutorNode
 from app.agents.verifier import VerifierNode
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
+
 
 def create_graph(router: ModelRouter, registry: ToolRegistry, checkpointer=None):
     graph = StateGraph(dict)
@@ -17,7 +19,6 @@ def create_graph(router: ModelRouter, registry: ToolRegistry, checkpointer=None)
     graph.add_node("verifier", verifier)
     graph.set_entry_point("planner")
     graph.add_edge("planner", "executor")
-    graph.add_edge("executor", "verifier")
 
     def should_loop(state):
         if state.get("done", False):
@@ -25,6 +26,14 @@ def create_graph(router: ModelRouter, registry: ToolRegistry, checkpointer=None)
         else:
             return "planner"
 
+    def still_executing(state):
+        if state.get("current_step", 0) == len(state.get("plan", [])):
+            return "verifier"
+        else:
+            return "executor"
+
+
     graph.add_conditional_edges("verifier", should_loop)
+    graph.add_conditional_edges("executor", still_executing)
 
     return graph.compile(checkpointer=checkpointer)

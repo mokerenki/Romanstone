@@ -6,6 +6,7 @@ import traceback
 
 import structlog
 from langchain_core.messages import HumanMessage
+from langchain_core.load import dumps
 
 # Import necessary components from your application
 from app.graph import create_graph
@@ -35,7 +36,7 @@ async def stream_task_events(
         "task": user_message,
         "user_id": user_id,
         "tenant_id": tenant_id,
-        "messages": [HumanMessage(content=user_message)],
+        "messages": [dumps(HumanMessage(content=user_message))],
         "plan": [],
         "current_step": 0, # Ensure this matches what executor.py expects
         "results": [],
@@ -68,7 +69,12 @@ async def stream_task_events(
 
             # Customize event types for frontend consumption
             if event_type == "planner":
-                yield {"type": "planner_output", "content": node_output.get("plan"), "timestamp": datetime.now(timezone.utc).isoformat()}
+                yield {
+                    "type": "planner_output", 
+                    "content": node_output.get("plan"), 
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "tool": node_output.get("tool","")
+                }
             elif event_type == "executor":
                 # Executor output contains results from steps
                 results = node_output.get("results", [])

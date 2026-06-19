@@ -1,0 +1,1317 @@
+ Image romanstone-backend Building 
+ Image romanstone-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 959B done
+#1 DONE 0.0s
+
+#2 [backend internal] load build definition from Dockerfile
+#2 transferring dockerfile: 745B done
+#2 DONE 0.1s
+
+#3 [frontend internal] load build definition from Dockerfile
+#3 transferring dockerfile: 472B done
+#3 DONE 0.1s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#4 DONE 1.3s
+
+#5 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#5 DONE 1.2s
+
+#6 [backend internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.1s
+
+#7 [frontend internal] load .dockerignore
+#7 transferring context: 2B done
+#7 DONE 0.1s
+
+#8 [backend internal] load build context
+#8 DONE 0.0s
+
+#9 [frontend internal] load build context
+#9 DONE 0.0s
+
+#10 [backend 1/9] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#10 resolve docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf 0.2s done
+#10 DONE 0.2s
+
+#11 [frontend builder 1/6] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#11 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#11 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 0.2s done
+#11 DONE 0.2s
+
+#8 [backend internal] load build context
+#8 transferring context: 11.97kB done
+#8 DONE 0.1s
+
+#9 [frontend internal] load build context
+#9 transferring context: 994B done
+#9 DONE 0.1s
+
+#12 [backend 3/9] WORKDIR /app
+#12 CACHED
+
+#13 [backend 2/9] RUN apt-get update && apt-get install -y --no-install-recommends     gcc libpq-dev curl && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [backend 5/9] RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
+#14 CACHED
+
+#15 [backend 4/9] COPY requirements.txt .
+#15 CACHED
+
+#16 [backend 6/9] RUN playwright install chromium && playwright install-deps chromium
+#16 CACHED
+
+#17 [frontend builder 6/6] RUN npm run build
+#17 CACHED
+
+#18 [frontend stage-1 4/5] COPY --from=builder /app/package.json ./
+#18 CACHED
+
+#19 [frontend builder 3/6] COPY package.json package-lock.json* ./
+#19 CACHED
+
+#20 [frontend builder 2/6] WORKDIR /app
+#20 CACHED
+
+#21 [frontend builder 5/6] COPY . .
+#21 CACHED
+
+#22 [frontend builder 4/6] RUN npm install --legacy-peer-deps
+#22 CACHED
+
+#23 [frontend stage-1 3/5] COPY --from=builder /app/.next ./.next
+#23 CACHED
+
+#24 [frontend stage-1 5/5] COPY --from=builder /app/node_modules ./node_modules
+#24 CACHED
+
+#25 [frontend] exporting to image
+#25 exporting layers done
+#25 exporting manifest sha256:ac8079d05b6591152631d673c00a0cd4faef618ce5643938dc04b1c5d5c5035f 0.0s done
+#25 exporting config sha256:27158e8ab5ac6abd09c95d983da487964d9d8fa3df4aeb6c658536dd0021d627
+#25 exporting config sha256:27158e8ab5ac6abd09c95d983da487964d9d8fa3df4aeb6c658536dd0021d627 0.0s done
+#25 exporting attestation manifest sha256:7ef39bf0ffc5a7e6dba776afe17709e7915b8de1826e65e2ca7707c235c1a86a
+#25 ...
+
+#26 [backend 7/9] COPY . .
+#26 DONE 0.3s
+
+#25 [frontend] exporting to image
+#25 exporting attestation manifest sha256:7ef39bf0ffc5a7e6dba776afe17709e7915b8de1826e65e2ca7707c235c1a86a 0.1s done
+#25 exporting manifest list sha256:c46c029c3b9e890bc38cfdc700c5545fe35162d014e6232046e3bf50c2af3573 0.0s done
+#25 naming to docker.io/library/romanstone-frontend:latest
+#25 naming to docker.io/library/romanstone-frontend:latest done
+#25 unpacking to docker.io/library/romanstone-frontend:latest 0.0s done
+#25 DONE 0.4s
+
+#27 [backend 8/9] RUN mkdir -p /tmp/aether/sandbox
+#27 ...
+
+#28 [frontend] resolving provenance for metadata file
+#28 DONE 0.0s
+
+#27 [backend 8/9] RUN mkdir -p /tmp/aether/sandbox
+#27 DONE 0.7s
+
+#29 [backend 9/9] RUN useradd -m -u 1000 aether && chown -R aether:aether /app /tmp/aether
+#29 DONE 0.8s
+
+#30 [backend] exporting to image
+#30 exporting layers 0.3s done
+#30 exporting manifest sha256:662c9d87ff52a75462ac9d0625ab8871e142880af5bdee4010efd25ed51cea83 0.0s done
+#30 exporting config sha256:430852512f480b8185ecfadbf4068dee690df0cf19b05f8d59f47d0efb398c7a 0.0s done
+#30 exporting attestation manifest sha256:365c5a1110266212caa2849ae3fbfecdf0cfb49beee1b338eac1e1a65173134f 0.1s done
+#30 exporting manifest list sha256:a6ffc7a4101a4af75e1267819de693db627133e0eb5a0597eb2e38f518c07387
+#30 exporting manifest list sha256:a6ffc7a4101a4af75e1267819de693db627133e0eb5a0597eb2e38f518c07387 0.0s done
+#30 naming to docker.io/library/romanstone-backend:latest 0.0s done
+#30 unpacking to docker.io/library/romanstone-backend:latest
+#30 unpacking to docker.io/library/romanstone-backend:latest 0.2s done
+#30 DONE 0.8s
+
+#31 [backend] resolving provenance for metadata file
+#31 DONE 0.0s
+ Image romanstone-backend Built 
+ Image romanstone-frontend Built 
+ Container romanstone-postgres-1 Running 
+ Container romanstone-qdrant-1 Running 
+ Container romanstone-redis-1 Running 
+ Container romanstone-backend-1 Recreate 
+ Container romanstone-backend-1 Recreated 
+ Container romanstone-frontend-1 Recreate 
+ Container romanstone-frontend-1 Recreated 
+Attaching to backend-1, frontend-1, postgres-1, qdrant-1, redis-1
+ Container romanstone-redis-1 Waiting 
+ Container romanstone-postgres-1 Waiting 
+ Container romanstone-qdrant-1 Waiting 
+ Container romanstone-postgres-1 Healthy 
+ Container romanstone-redis-1 Healthy 
+ Container romanstone-qdrant-1 Healthy 
+ Container romanstone-backend-1 Starting 
+ Container romanstone-backend-1 Started 
+ Container romanstone-backend-1 Waiting 
+backend-1  | 2026-06-17 16:25:13 [info     ] model_router.kimi_config       api_key_preview=sk-6aFcE... base_url=https://api.moonshot.ai/v1 model=kimi-latest
+backend-1  | 2026-06-17 16:25:13 [info     ] model_router.initialized
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.initialized
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.registered       tool=browser
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.registered       tool=python_repl
+backend-1  | 2026-06-17 16:25:13 [info     ] memory_retriever_tool.initialized
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.registered       tool=memory_retriever
+backend-1  | 2026-06-17 16:25:13 [info     ] model_router.kimi_config       api_key_preview=sk-6aFcE... base_url=https://api.moonshot.ai/v1 model=kimi-latest
+backend-1  | 2026-06-17 16:25:13 [info     ] model_router.initialized
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.initialized
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.registered       tool=browser
+backend-1  | 2026-06-17 16:25:13 [info     ] tool_registry.registered       tool=python_repl
+backend-1  | 2026-06-17 16:25:13 [info     ] policy_engine.initialized
+backend-1  | INFO:     Started server process [1]
+backend-1  | INFO:     Waiting for application startup.
+backend-1  | 2026-06-17 16:25:13 [info     ] app.startup
+backend-1  | 2026-06-17 16:25:13 [info     ] cognee_memory.initializing
+qdrant-1   | 2026-06-17T16:25:13.689162Z  INFO storage::content_manager::toc::collection_meta_ops: Deleting collection aether_memory
+qdrant-1   | 2026-06-17T16:25:13.700764Z  INFO actix_web::middleware::logger: 172.18.0.5 "DELETE /collections/aether_memory HTTP/1.1" 200 57 "-" "python-client/1.18.0 python/3.12.13" 0.015352
+qdrant-1   | 2026-06-17T16:25:13.705158Z  INFO storage::content_manager::toc::collection_meta_ops: Creating collection aether_memory
+qdrant-1   | 2026-06-17T16:25:13.914473Z  INFO actix_web::middleware::logger: 172.18.0.5 "PUT /collections/aether_memory HTTP/1.1" 200 57 "-" "python-client/1.18.0 python/3.12.13" 0.209647
+backend-1  | 2026-06-17 16:25:13 [info     ] qdrant.client_initialized      collection=aether_memory
+backend-1  | 2026-06-17 16:25:13 [info     ] kuzu_graph.initialized         db_path=/tmp/aether_api/kuzu.db
+backend-1  | 2026-06-17 16:25:13 [info     ] kuzu_graph.connecting          db_path=/tmp/aether_api/kuzu.db
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Case
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Party
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Document
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Law
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Person
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Organization
+backend-1  | 2026-06-17 16:25:14 [info     ] kuzu_graph.node_table_created  table=Location
+backend-1  | 2026-06-17 16:25:14 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 52)\n"CREATE REL TABLE `HAS_PARTY`(FROM `Case` TO `Party` PROPERTIES (role STRING, valid_from STRING, valid_to STRING))"\n                                                     ^^^^^^^^^^' table=HAS_PARTY
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `HAS_PARTY`[0m[32m([0m[32mFROM `Case` TO `Party`[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mPROPERTIES [0m[32m([0m[32mrole STRING, val'[0m+[1;36m33[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 52[0m[32m)[0m[32m\n"CREATE REL TABLE `HAS_PARTY`[0m[32m([0m[32mFROM [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Case` TO `Party` PROPERTIES [0m[32m([0m[32mrole STRING, [0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n             [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'case_number'[0m: [32m'STRING'[0m,                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'title'[0m: [32m'STRING'[0m,                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'status'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'jurisdiction'[0m: [32m'STRING'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'filing_date'[0m: [32m'STRING'[0m                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_PARTY'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Party'[0m,                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[32m'role'[0m: [32m'STRING'[0m[1m}[0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_DOCUMENT'[0m: [1m{[0m                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Document'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   │   [0m[32m'relation_type'[0m: [32m'STRING'[0m            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[1m}[0m                                        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'RELATES_TO_LAW'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Law'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Case'[0m                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m190[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'HAS_PARTY'[0m                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'role STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'role STRING, valid_from STRING, valid_to STRING'[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'target_type'[0m: [32m'Party'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m[32m'role'[0m: [32m'STRING'[0m[1m}[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Party'[0m                                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_PARTY`[0m[32m([0m[32mFROM `Case` TO `Party` [0m       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32mPROPERTIES [0m[32m([0m[32mrole STRING, val'[0m+[1;36m33[0m                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_PARTY`[0m[32m([0m[32mFROM `Case` TO `Party` [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32mPROPERTIES [0m[32m([0m[32mrole STRING, val'[0m+[1;36m33[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m52[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `HAS_PARTY`[0m[32m([0m[32mFROM `Case` TO `Party` PROPERTIES [0m[32m([0m[32mrole STRING, [0m
+backend-1  | [32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                      ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:14 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 58)\n"CREATE REL TABLE `HAS_DOCUMENT`(FROM `Case` TO `Document` PROPERTIES (relation_type STRING, valid_from STRING, valid_to STRING))"\n                                                           ^^^^^^^^^^' table=HAS_DOCUMENT
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `HAS_DOCUMENT`[0m[32m([0m[32mFROM `Case` TO [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Document` PROPERTIES [0m[32m([0m[32mrelation_t'[0m+[1;36m48[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 58[0m[32m)[0m[32m\n"CREATE REL TABLE `HAS_DOCUMENT`[0m[32m([0m[32mFROM [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Case` TO `Document` PROPERTIES [0m[32m([0m[32mrelation_type [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n     [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'case_number'[0m: [32m'STRING'[0m,                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'title'[0m: [32m'STRING'[0m,                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'status'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'jurisdiction'[0m: [32m'STRING'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'filing_date'[0m: [32m'STRING'[0m                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_PARTY'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Party'[0m,                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[32m'role'[0m: [32m'STRING'[0m[1m}[0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_DOCUMENT'[0m: [1m{[0m                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Document'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   │   [0m[32m'relation_type'[0m: [32m'STRING'[0m            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[1m}[0m                                        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'RELATES_TO_LAW'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Law'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Case'[0m                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m211[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'HAS_DOCUMENT'[0m                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relation_type STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'relation_type STRING, valid_from STRING, valid_to [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING'[0m                                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'target_type'[0m: [32m'Document'[0m,                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m[32m'relation_type'[0m: [32m'STRING'[0m[1m}[0m        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Document'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_DOCUMENT`[0m[32m([0m[32mFROM `Case` TO `Document` [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32mPROPERTIES [0m[32m([0m[32mrelation_t'[0m+[1;36m48[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_DOCUMENT`[0m[32m([0m[32mFROM `Case` TO [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32m`Document` PROPERTIES [0m[32m([0m[32mrelation_t'[0m+[1;36m48[0m                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m58[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `HAS_DOCUMENT`[0m[32m([0m[32mFROM `Case` TO `Document` PROPERTIES [0m
+backend-1  | [32m([0m[32mrelation_type STRING, valid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                            ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:14 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 55)\n"CREATE REL TABLE `RELATES_TO_LAW`(FROM `Case` TO `Law` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                        ^^^^^^^^^^' table=RELATES_TO_LAW
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `RELATES_TO_LAW`[0m[32m([0m[32mFROM `Case` TO [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Law` PROPERTIES [0m[32m([0m[32mvalid_from ST'[0m+[1;36m23[0m                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 55[0m[32m)[0m[32m\n"CREATE REL TABLE `RELATES_TO_LAW`[0m[32m([0m[32mFROM[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Case` TO `Law` PROPERTIES [0m[32m([0m[32mvalid_from STRING, [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mvalid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                                [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'case_number'[0m: [32m'STRING'[0m,                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'title'[0m: [32m'STRING'[0m,                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'status'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'jurisdiction'[0m: [32m'STRING'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'filing_date'[0m: [32m'STRING'[0m                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_PARTY'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Party'[0m,                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[32m'role'[0m: [32m'STRING'[0m[1m}[0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_DOCUMENT'[0m: [1m{[0m                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Document'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   │   [0m[32m'relation_type'[0m: [32m'STRING'[0m            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[1m}[0m                                        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'RELATES_TO_LAW'[0m: [1m{[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Law'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Case'[0m                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m183[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'RELATES_TO_LAW'[0m                                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Law'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Law'[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `RELATES_TO_LAW`[0m[32m([0m[32mFROM `Case` TO `Law` [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32mPROPERTIES [0m[32m([0m[32mvalid_from ST'[0m+[1;36m23[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `RELATES_TO_LAW`[0m[32m([0m[32mFROM `Case` TO `Law` [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32mPROPERTIES [0m[32m([0m[32mvalid_from ST'[0m+[1;36m23[0m                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m55[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `RELATES_TO_LAW`[0m[32m([0m[32mFROM `Case` TO `Law` PROPERTIES [0m[32m([0m[32mvalid_from [0m
+backend-1  | [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                         ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:14 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 54)\n"CREATE REL TABLE `REPRESENTS`(FROM `Party` TO `Party` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                       ^^^^^^^^^^' table=REPRESENTS
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `REPRESENTS`[0m[32m([0m[32mFROM `Party` TO [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Party` PROPERTIES [0m[32m([0m[32mvalid_from STR'[0m+[1;36m22[0m               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 54[0m[32m)[0m[32m\n"CREATE REL TABLE `REPRESENTS`[0m[32m([0m[32mFROM [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Party` TO `Party` PROPERTIES [0m[32m([0m[32mvalid_from STRING, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mvalid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                                [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'name'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'type'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'organization'[0m: [32m'STRING'[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'REPRESENTS'[0m: [1m{[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Party'[0m,                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_CONTACT'[0m: [1m{[0m                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'ContactInfo'[0m,            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Party'[0m                                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m181[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'REPRESENTS'[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Party'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Party'[0m                                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `REPRESENTS`[0m[32m([0m[32mFROM `Party` TO `Party` [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32mPROPERTIES [0m[32m([0m[32mvalid_from STR'[0m+[1;36m22[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `REPRESENTS`[0m[32m([0m[32mFROM `Party` TO `Party` [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32mPROPERTIES [0m[32m([0m[32mvalid_from STR'[0m+[1;36m22[0m                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m54[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `REPRESENTS`[0m[32m([0m[32mFROM `Party` TO `Party` PROPERTIES [0m[32m([0m[32mvalid_from [0m
+backend-1  | [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                        ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 61)\n"CREATE REL TABLE `HAS_CONTACT`(FROM `Party` TO `ContactInfo` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                              ^^^^^^^^^^' table=HAS_CONTACT
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `HAS_CONTACT`[0m[32m([0m[32mFROM `Party` TO [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`ContactInfo` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 61[0m[32m)[0m[32m\n"CREATE REL TABLE `HAS_CONTACT`[0m[32m([0m[32mFROM [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Party` TO `ContactInfo` PROPERTIES [0m[32m([0m[32mvalid_from [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                        [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'name'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'type'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'organization'[0m: [32m'STRING'[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'REPRESENTS'[0m: [1m{[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Party'[0m,                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_CONTACT'[0m: [1m{[0m                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'ContactInfo'[0m,            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Party'[0m                                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m195[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'HAS_CONTACT'[0m                                        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'ContactInfo'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'ContactInfo'[0m                                        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_CONTACT`[0m[32m([0m[32mFROM `Party` TO [0m            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32m`ContactInfo` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_CONTACT`[0m[32m([0m[32mFROM `Party` TO [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32m`ContactInfo` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m61[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `HAS_CONTACT`[0m[32m([0m[32mFROM `Party` TO `ContactInfo` PROPERTIES [0m
+backend-1  | [32m([0m[32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                               ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 60)\n"CREATE REL TABLE `REFERENCES`(FROM `Document` TO `Document` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                             ^^^^^^^^^^' table=REFERENCES
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `REFERENCES`[0m[32m([0m[32mFROM `Document` TO [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Document` PROPERTIES [0m[32m([0m[32mvalid_fr'[0m+[1;36m28[0m                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 60[0m[32m)[0m[32m\n"CREATE REL TABLE `REFERENCES`[0m[32m([0m[32mFROM [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Document` TO `Document` PROPERTIES [0m[32m([0m[32mvalid_from [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                        [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'document_id'[0m: [32m'STRING'[0m,                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'title'[0m: [32m'STRING'[0m,                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'type'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'author'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'creation_date'[0m: [32m'STRING'[0m,                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'summary'[0m: [32m'STRING'[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'REFERENCES'[0m: [1m{[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Document'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'MENTIONS'[0m: [1m{[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Person'[0m,                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Document'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m193[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'REFERENCES'[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Document'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Document'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `REFERENCES`[0m[32m([0m[32mFROM `Document` TO [0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32m`Document` PROPERTIES [0m[32m([0m[32mvalid_fr'[0m+[1;36m28[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `REFERENCES`[0m[32m([0m[32mFROM `Document` TO [0m       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32m`Document` PROPERTIES [0m[32m([0m[32mvalid_fr'[0m+[1;36m28[0m                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m60[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `REFERENCES`[0m[32m([0m[32mFROM `Document` TO `Document` PROPERTIES [0m
+backend-1  | [32m([0m[32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                              ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 56)\n"CREATE REL TABLE `MENTIONS`(FROM `Document` TO `Person` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                         ^^^^^^^^^^' table=MENTIONS
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `MENTIONS`[0m[32m([0m[32mFROM `Document` TO [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Person` PROPERTIES [0m[32m([0m[32mvalid_from S'[0m+[1;36m24[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 56[0m[32m)[0m[32m\n"CREATE REL TABLE `MENTIONS`[0m[32m([0m[32mFROM [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Document` TO `Person` PROPERTIES [0m[32m([0m[32mvalid_from [0m       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                        [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'document_id'[0m: [32m'STRING'[0m,                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'title'[0m: [32m'STRING'[0m,                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'type'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'author'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'creation_date'[0m: [32m'STRING'[0m,                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'summary'[0m: [32m'STRING'[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'REFERENCES'[0m: [1m{[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Document'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m,                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'MENTIONS'[0m: [1m{[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Person'[0m,                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Document'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m185[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'MENTIONS'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Person'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Person'[0m                                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `MENTIONS`[0m[32m([0m[32mFROM `Document` TO `Person` [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32mPROPERTIES [0m[32m([0m[32mvalid_from S'[0m+[1;36m24[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `MENTIONS`[0m[32m([0m[32mFROM `Document` TO `Person`[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32mPROPERTIES [0m[32m([0m[32mvalid_from S'[0m+[1;36m24[0m                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m56[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `MENTIONS`[0m[32m([0m[32mFROM `Document` TO `Person` PROPERTIES [0m[32m([0m[32mvalid_from [0m
+backend-1  | [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                          ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 46)\n"CREATE REL TABLE `AMENDS`(FROM `Law` TO `Law` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                               ^^^^^^^^^^' table=AMENDS
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `AMENDS`[0m[32m([0m[32mFROM `Law` TO `Law` [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mPROPERTIES [0m[32m([0m[32mvalid_from STRING, val'[0m+[1;36m14[0m               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 46[0m[32m)[0m[32m\n"CREATE REL TABLE `AMENDS`[0m[32m([0m[32mFROM `Law` [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mTO `Law` PROPERTIES [0m[32m([0m[32mvalid_from STRING, valid_to [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING[0m[32m)[0m[32m)[0m[32m"\n                                         [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'law_id'[0m: [32m'STRING'[0m,                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'name'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'jurisdiction'[0m: [32m'STRING'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'effective_date'[0m: [32m'STRING'[0m                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'AMENDS'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Law'[0m,                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Law'[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m165[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'AMENDS'[0m                                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Law'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Law'[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `AMENDS`[0m[32m([0m[32mFROM `Law` TO `Law` PROPERTIES [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32m([0m[32mvalid_from STRING, val'[0m+[1;36m14[0m                                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `AMENDS`[0m[32m([0m[32mFROM `Law` TO `Law` [0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32mPROPERTIES [0m[32m([0m[32mvalid_from STRING, val'[0m+[1;36m14[0m                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m46[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `AMENDS`[0m[32m([0m[32mFROM `Law` TO `Law` PROPERTIES [0m[32m([0m[32mvalid_from STRING, [0m
+backend-1  | [32mvalid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 61)\n"CREATE REL TABLE `WORKS_FOR`(FROM `Person` TO `Organization` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                              ^^^^^^^^^^' table=WORKS_FOR
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `WORKS_FOR`[0m[32m([0m[32mFROM `Person` TO [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Organization` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 61[0m[32m)[0m[32m\n"CREATE REL TABLE `WORKS_FOR`[0m[32m([0m[32mFROM [0m     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Person` TO `Organization` PROPERTIES [0m[32m([0m[32mvalid_from [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                        [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'name'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'date_of_birth'[0m: [32m'STRING'[0m,                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'gender'[0m: [32m'STRING'[0m                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'WORKS_FOR'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Organization'[0m,           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Person'[0m                                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m195[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'WORKS_FOR'[0m                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Organization'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Organization'[0m                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `WORKS_FOR`[0m[32m([0m[32mFROM `Person` TO [0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32m`Organization` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `WORKS_FOR`[0m[32m([0m[32mFROM `Person` TO [0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32m`Organization` PROPERTIES [0m[32m([0m[32mvalid_f'[0m+[1;36m29[0m                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m61[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `WORKS_FOR`[0m[32m([0m[32mFROM `Person` TO `Organization` PROPERTIES [0m
+backend-1  | [32m([0m[32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                               ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [warning  ] kuzu_graph.rel_table_creation_failed error='Parser exception: mismatched input \'PROPERTIES\' expecting {\')\', \',\'} (line: 1, offset: 64)\n"CREATE REL TABLE `HAS_OFFICE`(FROM `Organization` TO `Location` PROPERTIES (valid_from STRING, valid_to STRING))"\n                                                                 ^^^^^^^^^^' table=HAS_OFFICE
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mgraph_setup.py[0m:247 in _create_schema                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m244 [0m[2m│   │   │   │   [0m                                                       [31m│[0m
+backend-1  | [31m│[0m   [2m245 [0m[2m│   │   │   │   [0m[94mtry[0m:                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m246 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m247 [2m│   │   │   │   │   [0m[96mself[0m.conn.execute(create_rel_query)                [31m│[0m
+backend-1  | [31m│[0m   [2m248 [0m[2m│   │   │   │   │   [0m                                                   [31m│[0m
+backend-1  | [31m│[0m   [2m249 [0m[2m│   │   │   │   │   [0mlogger.info(                                       [31m│[0m
+backend-1  | [31m│[0m   [2m250 [0m                                                                       [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mcreate_node_query[0m[31m =[0m [32m'CREATE NODE TABLE `Location`[0m[32m([0m[32mid STRING, address [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, city STRING, state STRIN'[0m+[1;36m73[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m  [3;33mcreate_rel_query[0m[31m =[0m [32m'CREATE REL TABLE `HAS_OFFICE`[0m[32m([0m[32mFROM `Organization` [0m  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mTO `Location` PROPERTIES [0m[32m([0m[32mvali'[0m+[1;36m32[0m                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [3;33me[0m[31m =[0m [1;35mRuntimeError[0m[1m([0m[32m'Parser exception: mismatched input [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m\'PROPERTIES\' expecting [0m[32m{[0m[32m\'[0m[32m)[0m[32m\', \',\'[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32moffset: 64[0m[32m)[0m[32m\n"CREATE REL TABLE `HAS_OFFICE`[0m[32m([0m[32mFROM [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m`Organization` TO `Location` PROPERTIES [0m[32m([0m[32mvalid_from [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"\n                        [0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32m^^^^^^^^^^'[0m[1m)[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m        [3;33mentity_def[0m[31m =[0m [1m{[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'properties'[0m: [1m{[0m                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'name'[0m: [32m'STRING'[0m,                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'type'[0m: [32m'STRING'[0m                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m,                                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'relationships'[0m: [1m{[0m                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[32m'HAS_OFFICE'[0m: [1m{[0m                              [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'target_type'[0m: [32m'Location'[0m,               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   │   [0m[32m'properties'[0m: [1m{[0m[1m}[0m                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   │   [0m[1m}[0m                                            [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[1m}[0m                                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m}[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mentity_type[0m[31m =[0m [32m'Organization'[0m                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m               [3;33mmsg[0m[31m =[0m [32m"Parser exception: mismatched input 'PROPERTIES' [0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mexpecting [0m[32m{[0m[32m'[0m[32m)[0m[32m', ','[0m[32m}[0m[32m [0m[32m([0m[32mline: 1, o"[0m+[1;36m201[0m                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m   [3;33mproperties_list[0m[31m =[0m [1m[[0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'address STRING'[0m,                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'city STRING'[0m,                                   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'state STRING'[0m,                                  [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'zip_code STRING'[0m,                               [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_from STRING'[0m,                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [2;32m│   [0m[32m'valid_to STRING'[0m                                [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1m][0m                                                    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mproperties_str[0m[31m =[0m [32m'address STRING, city STRING, state STRING, zip_code[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [32mSTRING, valid_from STRING, v'[0m+[1;36m14[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mrel_name[0m[31m =[0m [32m'HAS_OFFICE'[0m                                         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_props_list[0m[31m =[0m [1m[[0m[32m'valid_from STRING'[0m, [32m'valid_to STRING'[0m[1m][0m             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m     [3;33mrel_props_str[0m[31m =[0m [32m'valid_from STRING, valid_to STRING'[0m                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mrel_target_def[0m[31m =[0m [1m{[0m[32m'target_type'[0m: [32m'Location'[0m, [32m'properties'[0m: [1m{[0m[1m}[0m[1m}[0m        [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.graph_setup.KuzuGraph[0m[39m object at [0m         [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                     [1;36m0x7abc96ed9970[0m[1m>[0m                                      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mtarget_type[0m[31m =[0m [32m'Location'[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:328 in execute [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m325 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m326 [0m[2m│   │   [0m[94mif[0m [96mself[0m._using_pybind_backend():                               [31m│[0m
+backend-1  | [31m│[0m   [2m327 [0m[2m│   │   │   [0m[94mif[0m [96misinstance[0m(query, [96mstr[0m):                                 [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m328 [2m│   │   │   │   [0mquery_result_internal = [1;4;96mself[0m[1;4m._execute_with_pybind(quer[0m [31m│[0m
+backend-1  | [31m│[0m   [2m329 [0m[2m│   │   │   [0m[94melse[0m:                                                      [31m│[0m
+backend-1  | [31m│[0m   [2m330 [0m[2m│   │   │   │   [0mquery_result_internal = [96mself[0m._connection.execute(      [31m│[0m
+backend-1  | [31m│[0m   [2m331 [0m[2m│   │   │   │   │   [0mquery._prepared_statement,                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m      [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_OFFICE`[0m[32m([0m[32mFROM `Organization` TO [0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m              [32m`Location` PROPERTIES [0m[32m([0m[32mvali'[0m+[1;36m32[0m                             [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m       [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m    [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [2m/usr/local/lib/python3.12/site-packages/ladybug/[0m[1mconnection.py[0m:255 in         [31m│[0m
+backend-1  | [31m│[0m _execute_with_pybind                                                         [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m252 [0m[2m│   │   │   [0m[94mreturn[0m [94mNone[0m                                                [31m│[0m
+backend-1  | [31m│[0m   [2m253 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m254 [0m[2m│   │   [0m[94mif[0m [96mlen[0m(parameters) == [94m0[0m:                                       [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m255 [2m│   │   │   [0m[94mreturn[0m [1;4mpy_connection.query(query)[0m                          [31m│[0m
+backend-1  | [31m│[0m   [2m256 [0m[2m│   │   [0m                                                               [31m│[0m
+backend-1  | [31m│[0m   [2m257 [0m[2m│   │   [0mprepared = py_connection.prepare(query, parameters)            [31m│[0m
+backend-1  | [31m│[0m   [2m258 [0m[2m│   │   [0m[94mreturn[0m py_connection.execute(prepared, parameters)             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m    [3;33mparameters[0m[31m =[0m [1m{[0m[1m}[0m                                                       [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mpy_connection[0m[31m =[0m [1m<[0m[1;95mladybug._lbug.Connection[0m[39m object at [0m[1;36m0x7abc963a1ab0[0m[1m>[0m      [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mquery[0m[31m =[0m [32m'CREATE REL TABLE `HAS_OFFICE`[0m[32m([0m[32mFROM `Organization` TO [0m   [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                 [32m`Location` PROPERTIES [0m[32m([0m[32mvali'[0m+[1;36m32[0m                          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m          [3;33mself[0m[31m =[0m [1m<[0m[1;95mladybug.connection.Connection[0m[39m object at [0m[1;36m0x7abc96f6adb0[0m[1m>[0m [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mRuntimeError: [0mParser exception: mismatched input [32m'PROPERTIES'[0m expecting [1m{[0m[32m'[0m[32m)[0m[32m'[0m, 
+backend-1  | [32m','[0m[1m}[0m [1m([0mline: [1;36m1[0m, offset: [1;36m64[0m[1m)[0m
+backend-1  | [32m"CREATE REL TABLE `HAS_OFFICE`[0m[32m([0m[32mFROM `Organization` TO `Location` PROPERTIES [0m
+backend-1  | [32m([0m[32mvalid_from STRING, valid_to STRING[0m[32m)[0m[32m)[0m[32m"[0m
+backend-1  |                                                                  ^^^^^^^^^^
+backend-1  | 
+backend-1  | 2026-06-17 16:25:15 [info     ] kuzu_graph.connected_and_schema_created
+backend-1  | 2026-06-17 16:25:15 [info     ] kuzu_graph.initialized         db_path=/tmp/aether_api/kuzu.db
+backend-1  | 2026-06-17 16:25:15 [error    ] cognee_memory.initialization_failed error="name 'os' is not defined"
+backend-1  | [31m╭─[0m[31m────────────────────[0m[31m [0m[1;31mTraceback [0m[1;2;31m(most recent call last)[0m[31m [0m[31m─────────────────────[0m[31m─╮[0m
+backend-1  | [31m│[0m [2m/app/app/memory/[0m[1mcognee_setup.py[0m:64 in initialize                             [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m   [2m 61 [0m[2m│   │   │   [0m                                                           [31m│[0m
+backend-1  | [31m│[0m   [2m 62 [0m[2m│   │   │   [0m[2m# Initialize OpenAI Client (for embeddings and entity extr[0m [31m│[0m
+backend-1  | [31m│[0m   [2m 63 [0m[2m│   │   │   [0m[96mself[0m.openai_client = AsyncOpenAI(                          [31m│[0m
+backend-1  | [31m│[0m [31m❱ [0m 64 [2m│   │   │   │   [0mapi_key=os.environ.get([33m"[0m[33mOPENAI_API_KEY[0m[33m"[0m),              [31m│[0m
+backend-1  | [31m│[0m   [2m 65 [0m[2m│   │   │   │   [0mbase_url=os.environ.get([33m"[0m[33mOPENAI_API_BASE[0m[33m"[0m) [2m# Use custo[0m [31m│[0m
+backend-1  | [31m│[0m       [2mconfigured[0m                                                             [31m│[0m
+backend-1  | [31m│[0m   [2m 66 [0m[2m│   │   │   [0m)                                                          [31m│[0m
+backend-1  | [31m│[0m   [2m 67 [0m[2m│   │   │   [0mlogger.info([33m"[0m[33mopenai.client_initialized[0m[33m"[0m)                   [31m│[0m
+backend-1  | [31m│[0m                                                                              [31m│[0m
+backend-1  | [31m│[0m [34m╭─[0m[34m────────────────────────────────[0m[34m locals [0m[34m────────────────────────────────[0m[34m─╮[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m            [3;33me[0m[31m =[0m [1;35mNameError[0m[1m([0m[32m"name 'os' is not defined"[0m[1m)[0m                     [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m [3;33mkuzu_db_path[0m[31m =[0m [32m'/tmp/aether_api/kuzu.db'[0m                                 [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m         [3;33mself[0m[31m =[0m [1m<[0m[1;95mapp.memory.cognee_setup.CogneeMemory[0m[39m object at [0m          [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m│[0m                [1;36m0x7abc970c02c0[0m[1m>[0m                                           [34m│[0m [31m│[0m
+backend-1  | [31m│[0m [34m╰──────────────────────────────────────────────────────────────────────────╯[0m [31m│[0m
+backend-1  | [31m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+backend-1  | [1;91mNameError: [0mname [32m'os'[0m is not defined
+backend-1  | 
+backend-1  | ERROR:    Traceback (most recent call last):
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 638, in lifespan
+backend-1  |     async with self.lifespan_context(app) as maybe_state:
+backend-1  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+backend-1  |     return await anext(self.gen)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 225, in merged_lifespan
+backend-1  |     async with original_context(app) as maybe_original_state:
+backend-1  |                ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+backend-1  |     return await anext(self.gen)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 225, in merged_lifespan
+backend-1  |     async with original_context(app) as maybe_original_state:
+backend-1  |                ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+backend-1  |     return await anext(self.gen)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/fastapi/routing.py", line 225, in merged_lifespan
+backend-1  |     async with original_context(app) as maybe_original_state:
+backend-1  |                ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+backend-1  |     return await anext(self.gen)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/app/app/main.py", line 171, in lifespan
+backend-1  |     await _cognee_memory.initialize()
+backend-1  |   File "/app/app/memory/cognee_setup.py", line 64, in initialize
+backend-1  |     api_key=os.environ.get("OPENAI_API_KEY"),
+backend-1  |             ^^
+backend-1  | NameError: name 'os' is not defined. Did you forget to import 'os'
+backend-1  | 
+backend-1  | ERROR:    Application startup failed. Exiting.
+ Container romanstone-backend-1 Error dependency backend failed to start
+dependency failed to start: container romanstone-backend-1 exited (3)

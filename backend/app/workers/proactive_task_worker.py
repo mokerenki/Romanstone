@@ -8,6 +8,7 @@ import os
 import traceback
 from typing import Any, Dict, Optional
 from langchain_core.messages import HumanMessage
+from langchain_core.load import dumps
 
 # Import necessary components for the agent loop
 from app.graph import create_graph
@@ -137,7 +138,7 @@ class ProactiveTaskWorker:
             "task": task_description,
             "user_id": user_id,
             "tenant_id": tenant_id,
-            "messages": [HumanMessage(content=f"{task_description}\n\nContext: {context}")],
+            "messages": [dumps(HumanMessage(content=f"{task_description}\n\nContext: {context}"))],
             "plan": [], "current_step": 0, "tool_calls": [],
             "verification": None, "needs_replan": False, "final_answer": None,
             "status": "pending", "cost_metrics": {

@@ -5,7 +5,7 @@ import os
 import structlog
 
 # Import the heartbeat daemon instance to trigger config reload
-from app.heartbeat.daemon import heartbeat_daemon
+from app.heartbeat.daemon import HeartbeatDaemon
 
 logger = structlog.get_logger("aether.api.heartbeat_config")
 router = APIRouter()
@@ -47,7 +47,7 @@ async def update_heartbeat_config(new_config: Dict[str, Any]) -> Dict[str, Any]:
             f.write(yaml_output)
         
         # Trigger the daemon to reload its configuration and reschedule probes
-        await heartbeat_daemon.load_config()
+        await HeartbeatDaemon.load_config()
 
         logger.info("heartbeat_config.update", status="success")
         return {"message": "Heartbeat configuration updated and reloaded successfully", "config": new_config}
@@ -62,11 +62,11 @@ async def get_heartbeat_status() -> Dict[str, Any]:
     """Retrieves the current operational status of the heartbeat daemon and its probes."""
     # This endpoint provides real-time status from the running daemon instance
     status_info = {
-        "daemon_running": heartbeat_daemon._running,
-        "scheduler_running": heartbeat_daemon.scheduler.running,
-        "probes_configured_count": len(heartbeat_daemon.probes),
-        "last_probe_runs": {name: ts.isoformat() for name, ts in heartbeat_daemon.last_probe_run.items()},
-        "config_last_loaded": heartbeat_daemon.config.get("last_loaded_at", "N/A"),
+        "daemon_running": HeartbeatDaemon._running,
+        "scheduler_running": HeartbeatDaemon.scheduler.running,
+        "probes_configured_count": len(HeartbeatDaemon.probes),
+        "last_probe_runs": {name: ts.isoformat() for name, ts in HeartbeatDaemon.last_probe_run.items()},
+        "config_last_loaded": HeartbeatDaemon.config.get("last_loaded_at", "N/A"),
         # Potentially add more detailed probe results or recent alerts
     }
     logger.info("heartbeat_config.status_retrieved")

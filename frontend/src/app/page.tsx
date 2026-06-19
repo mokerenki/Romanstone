@@ -149,15 +149,14 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-gray-400">Status</span>
             <span
-              className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                currentStatus === "completed"
-                  ? "bg-green-900 text-green-300"
-                  : currentStatus === "failed"
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${currentStatus === "completed"
+                ? "bg-green-900 text-green-300"
+                : currentStatus === "failed"
                   ? "bg-red-900 text-red-300"
                   : currentStatus === "running"
-                  ? "bg-blue-900 text-blue-300"
-                  : "bg-yellow-900 text-yellow-300"
-              }`}
+                    ? "bg-blue-900 text-blue-300"
+                    : "bg-yellow-900 text-yellow-300"
+                }`}
             >
               {currentStatus}
             </span>
