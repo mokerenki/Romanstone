@@ -1,6 +1,7 @@
 from langchain_core.messages import HumanMessage
 from app.tools.registry import ToolRegistry
 from app.core.model_router import ModelRouter
+from langchain_core.load import dumps
 
 class ExecutorNode:
     def __init__(self, registry: ToolRegistry, router: ModelRouter):

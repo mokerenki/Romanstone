@@ -213,6 +213,7 @@ from fastapi import APIRouter, WebSocket
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.load import dumps
 
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
@@ -332,7 +333,7 @@ async def create_task(request: Dict[str, Any]):
         "task": user_message,
         "user_id": user_id,
         "tenant_id": tenant_id,
-        "messages": [HumanMessage(content=user_message)],
+        "messages": [dumps(HumanMessage(content=user_message))],
         "plan": [],
         "current_step": 0,
         "tool_calls": [],

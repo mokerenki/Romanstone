@@ -1,5 +1,6 @@
 from langchain_core.messages import HumanMessage
 from app.core.model_router import ModelRouter
+from langchain_core.load import dumps
 
 class VerifierNode:
     def __init__(self, router: ModelRouter):

@@ -18,6 +18,7 @@ from app.core.config import CONFIG
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
 from app.graph import create_graph
+from langchain_core.load import dumps
 
 # -------------------------------------------------------------------------------
 # 1.  Redis (async) & Cognee memory
@@ -143,7 +144,7 @@ async def create_task(request: Dict[str, Any]):
         "task": user_message,
         "user_id": user_id,
         "tenant_id": tenant_id,
-        "messages": [HumanMessage(content=user_message)],
+        "messages": [dumps(HumanMessage(content=user_message))],
         "plan": [],
         "current_step": 0,
         "tool_calls": [],
