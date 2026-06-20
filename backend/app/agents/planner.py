@@ -1,13 +1,16 @@
 import json
+from langchain_core.messages import HumanMessage
 from app.core.model_router import ModelRouter
 from app.tools.registry import ToolRegistry
+from app.state import TaskState
+
 
 class PlannerNode:
     def __init__(self, router: ModelRouter, registry: ToolRegistry):
         self.router = router
         self.registry = registry
 
-    async def __call__(self, state: dict) -> dict:
+    async def __call__(self, state: TaskState) -> TaskState:
         task = state["task"]
         tools = self.registry.describe_all()
         feedback = state.get("feedback", "")
@@ -32,11 +35,31 @@ Return ONLY a JSON list of steps in the exact format:
   ...
 ]
 The last step MUST be the final answer step."""
-        resp = await self.router.route("planning", [{"role": "user", "content": prompt}])
+
+        resp = await self.router.route("planning", [HumanMessage(content=prompt)])
         try:
             plan = json.loads(resp.content)
             if not isinstance(plan, list):
-                plan = [{"action": task}]
+                raise ValueError("planning response not a list")
         except Exception:
-            plan = [{"action": task}]
-        return {**state, "plan": plan, "current_step": 0}
+            plan = [{"action": task, "tool": "", "args": {}, "description": task}]
+
+        sanitized_plan = []
+        for item in plan:
+            if not isinstance(item, dict):
+                item = {"action": str(item), "tool": "", "args": {}, "description": str(item)}
+            sanitized_plan.append({
+                "action": item.get("action", task),
+                "tool": item.get("tool", ""),
+                "args": item.get("args", {}),
+                "description": item.get("description", item.get("action", task)),
+                **{k: v for k, v in item.items() if k not in {"action", "tool", "args", "description"}}
+            })
+
+        return {
+            **state,
+            "plan": sanitized_plan,
+            "current_step": 0,
+            "results": [],  # Reset results on each new plan
+            "planning_iterations": state.get("planning_iterations", 0) + 1,
+        }
