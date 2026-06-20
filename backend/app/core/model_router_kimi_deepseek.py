@@ -15,6 +15,10 @@ class KimiDeepSeekRouter:
     Kimi K2.6: Best for complex reasoning, legal analysis, multi-step planning.
     DeepSeek-Chat: Best for general conversation, quick responses, summaries.
     """
+    ROLE_PLANNING = "planning"
+    ROLE_VERIFICATION = "verification"
+    ROLE_FALLBACK = "fallback"
+
 
     def __init__(self):
         self.kimi_base_url = os.environ.get("KIMI_BASE_URL", "https://api.moonshot.ai/v1" )

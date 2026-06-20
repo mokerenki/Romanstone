@@ -1,30 +1,90 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ForceGraph2D } from 'react-force-graph'; // npm install react-force-graph
+import dynamic from 'next/dynamic';
 import { useQuery } from 'react-query'; // npm install react-query
 import DatePicker from 'react-datepicker'; // npm install react-datepicker
 import 'react-datepicker/dist/react-datepicker.css';
+
+const ForceGraph2D = dynamic(
+  () => import('react-force-graph').then((mod) => mod.ForceGraph2D),
+  { ssr: false }
+);
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
-interface Node { id: string; label: string; color?: string; properties?: any; } // Added properties
-interface Link { source: string; target: string; label?: string; } // Added label
+interface Node { id: string; label: string; color?: string; properties?: any; }
+interface Link { source: string; target: string; label?: string; }
 interface GraphData { nodes: Node[]; links: Link[]; }
+
+/**
+ * Feature flag — set NEXT_PUBLIC_MEMORY_API_STABLE=true in your .env.local
+ * (or deployment environment) once the memory API contracts are verified stable.
+ * Until then, this page renders a Coming Soon banner instead of the full explorer.
+ */
+const MEMORY_API_STABLE = process.env.NEXT_PUBLIC_MEMORY_API_STABLE === 'true';
 
 // Schema for form validation
 const memoryQuerySchema = yup.object().shape({
   mode: yup.string().oneOf(['semantic', 'graph', 'temporal']).required('Query mode is required'),
   query: yup.string().required('Query text is required'),
-  entity_label: yup.string().when('mode', { is: 'temporal', then: yup.string().required('Entity label is required for temporal queries') }),
-  entity_id: yup.string().when('mode', { is: 'temporal', then: yup.string().required('Entity ID is required for temporal queries') }),
-  query_time: yup.date().when('mode', { is: 'temporal', then: yup.date().required('Query time is required for temporal queries') }),
-  top_k: yup.number().integer().min(1).when('mode', { is: 'semantic', then: yup.number().default(5) }),
+  entity_label: yup.string().when('mode', {
+    is: 'temporal',
+    then: (schema) => schema.required('Entity label is required for temporal queries'),
+  }),
+  entity_id: yup.string().when('mode', {
+    is: 'temporal',
+    then: (schema) => schema.required('Entity ID is required for temporal queries'),
+  }),
+  query_time: yup.date().when('mode', {
+    is: 'temporal',
+    then: (schema) => schema.required('Query time is required for temporal queries'),
+  }),
+  top_k: yup.number().integer().min(1).when('mode', {
+    is: 'semantic',
+    then: (schema) => schema.default(5),
+  }),
 });
 
+interface MemoryQueryFormData {
+  mode: 'semantic' | 'graph' | 'temporal';
+  query: string;
+  entity_label?: string;
+  entity_id?: string;
+  query_time?: Date;
+  top_k?: number;
+}
+
 export default function MemoryExplorerPage() {
-  const fgRef = useRef();
+  const fgRef = useRef<any>(null);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+
+  // ── Feature flag gate ────────────────────────────────────────────────────
+  if (!MEMORY_API_STABLE) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', minHeight: '60vh', gap: '1rem',
+        fontFamily: 'system-ui, sans-serif', color: '#6b7280',
+      }}>
+        <div style={{ fontSize: '3rem' }}>🧠</div>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+          Memory Explorer
+        </h2>
+        <p style={{ fontSize: '1rem', textAlign: 'center', maxWidth: '420px', margin: 0 }}>
+          The Memory Explorer is under active development. API contracts are being
+          stabilized before this feature is exposed.
+        </p>
+        <span style={{
+          padding: '0.25rem 0.75rem', borderRadius: '9999px',
+          background: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 600,
+        }}>
+          Coming Soon
+        </span>
+      </div>
+    );
+  }
+  // ── End feature flag gate ────────────────────────────────────────────────
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: yupResolver(memoryQuerySchema),
@@ -40,7 +100,7 @@ export default function MemoryExplorerPage() {
 
   const queryMode = watch('mode');
 
-  const fetchMemory = useCallback(async (formData: typeof memoryQuerySchema.fields) => {
+  const fetchMemory = useCallback(async (formData: any) => {
     const payload: any = { mode: formData.mode, query: formData.query };
     if (formData.mode === 'semantic') {
       payload.top_k = formData.top_k;
@@ -103,7 +163,7 @@ export default function MemoryExplorerPage() {
     }
   }, [data]);
 
-  const handleNodeClick = useCallback((node: Node) => {
+  const handleNodeClick = useCallback((node: any) => {
     setSelectedNode(node);
     // Center camera on clicked node
     // const distance = 40; // Example distance
@@ -201,7 +261,7 @@ export default function MemoryExplorerPage() {
                 render={({ field }) => (
                   <DatePicker
                     selected={field.value}
-                    onChange={(date: Date) => field.onChange(date)}
+                    onChange={(date: Date | null) => field.onChange(date)}
                     showTimeSelect
                     dateFormat="Pp"
                     className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -243,7 +303,7 @@ export default function MemoryExplorerPage() {
         </div>
       </form>
 
-      {isError && <div className="text-red-500 mb-4">Error: {error?.message}</div>}
+      {isError && <div className="text-red-500 mb-4">Error: {(error as any)?.message}</div>}
 
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 h-[700px] relative">
         <h2 className="text-xl font-semibold mb-4 text-white">Knowledge Graph Visualization</h2>
@@ -255,7 +315,8 @@ export default function MemoryExplorerPage() {
           linkDirectionalArrowRelPos={1}
           linkCurvature={0.25}
           onNodeClick={handleNodeClick}
-          nodeCanvasObject={(node, ctx, globalScale) => {
+          nodeCanvasObject={(node: any, ctx, globalScale) => {
+            if (node.x === undefined || node.y === undefined) return;
             const label = node.label;
             const fontSize = 12/globalScale;
             ctx.font = `${fontSize}px Sans-Serif`;
@@ -263,7 +324,7 @@ export default function MemoryExplorerPage() {
             const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+            ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = node.color || 'white';
@@ -271,12 +332,13 @@ export default function MemoryExplorerPage() {
 
             node.__bckgDimensions = bckgDimensions; // to re-use in nodePointerAreaPaint
           }}
-          nodePointerAreaPaint={(node, color, ctx) => {
+          nodePointerAreaPaint={(node: any, color, ctx) => {
+            if (node.x === undefined || node.y === undefined) return;
             ctx.fillStyle = color;
             const bckgDimensions = node.__bckgDimensions;
-            bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+            bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
           }}
-          linkCanvasObject={(link, ctx, globalScale) => {
+          linkCanvasObject={(link: any, ctx, globalScale) => {
             const label = link.label;
             if (!label) return;
 
@@ -285,6 +347,7 @@ export default function MemoryExplorerPage() {
 
             // ignore if link not yet rendered
             if (typeof start !== 'object' || typeof end !== 'object') return;
+            if (start.x === undefined || start.y === undefined || end.x === undefined || end.y === undefined) return;
 
             // calculate mid-point of the link
             const midx = (start.x + end.x) / 2;
