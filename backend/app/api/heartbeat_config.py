@@ -4,7 +4,11 @@ import yaml
 import os
 import structlog
 
-# Import the heartbeat daemon instance to trigger config reload
+# Import the heartbeat daemon instance to trigger config reload.
+# TODO: When heartbeat endpoint tests are needed, inject heartbeat_daemon via
+#       app.state (lifespan) and retrieve it with a Depends(get_heartbeat_daemon)
+#       provider — same pattern as tasks.py / memory_api.py.
+#       Currently safe: importing this module has no I/O side-effects.
 from app.heartbeat.daemon import heartbeat_daemon
 
 logger = structlog.get_logger("aether.api.heartbeat_config")

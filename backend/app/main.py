@@ -4,20 +4,23 @@ import structlog
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.api.heartbeat_config import router as heartbeat_config_router
 from app.api.tasks import router as tasks_router
-from app.api.websocket_handler import websocket_endpoint
 from app.api.memory_api import router as memory_api_router
 from app.core.config import settings
 from app.core.redis_checkpointer import RedisCheckpointer
 from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
+from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
+from app.tools.browser_tool import BrowserTool
+from app.tools.python_repl import PythonREPLTool
+from app.tools.registry import ToolRegistry
 
 logger = structlog.get_logger("aether.main")
 
@@ -47,13 +50,19 @@ async def lifespan(app: FastAPI):
         llm_router=app.state.model_router
     )
     await app.state.cognee_memory.initialize()
-    memory_api_router.cognee_memory = app.state.cognee_memory # Inject memory into router
     logger.info("cognee_memory.initialized")
 
     # Initialize Redis Checkpointer
     app.state.checkpointer = RedisCheckpointer(app.state.redis_client)
-    tasks_router.checkpointer = app.state.checkpointer # Inject checkpointer into tasks router
     logger.info("checkpointer.initialized")
+
+    # Initialize Tool Registry — endpoints retrieve this via Depends(get_tool_registry)
+    registry = ToolRegistry()
+    registry.register(BrowserTool())
+    registry.register(PythonREPLTool())
+    registry.register(MemoryRetrieverTool(app.state.cognee_memory))
+    app.state.tool_registry = registry
+    logger.info("tool_registry.initialized")
 
     # Initialize Browser Automation Service
     app.state.browser_service = BrowserAutomationService()
@@ -105,20 +114,9 @@ app.add_middleware(
  )
 
 # Include API routers
-app.include_router(heartbeat_config_router)
-app.include_router(tasks_router)
+app.include_router(heartbeat_config_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
 app.include_router(memory_api_router)
-
-# WebSocket endpoint
-@app.websocket("/ws")
-async def websocket_route(websocket: WebSocket):
-    await websocket_endpoint(
-        websocket,
-        app.state.cognee_memory,
-        app.state.checkpointer,
-        app.state.model_router,
-        app.state.browser_service # Pass browser service to websocket handler
-    )
 
 
 @app.get("/", response_class=HTMLResponse)

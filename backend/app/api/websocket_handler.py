@@ -6,12 +6,10 @@ import traceback
 
 import structlog
 from langchain_core.messages import HumanMessage
+from langchain_core.load import dumps
 
-# Import necessary components from your application
 from app.graph import create_graph
-# from app.core.config import CONFIG # Not directly used here, but good to know it's available
-# from app.core.model_router import ModelRouter # Passed as argument
-# from app.tools.registry import ToolRegistry # Passed as argument
+from app.state import TaskState
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -30,24 +28,29 @@ async def stream_task_events(
     # Create the graph instance for this task
     graph = create_graph(model_router, tool_registry, checkpointer)
 
-    initial_state = {
+    initial_state: TaskState = {
         "task_id": task_id,
         "task": user_message,
         "user_id": user_id,
         "tenant_id": tenant_id,
-        "messages": [HumanMessage(content=user_message)],
+        "messages": [dumps(HumanMessage(content=user_message))],
         "plan": [],
-        "current_step": 0, # Ensure this matches what executor.py expects
+        "current_step": 0,
         "results": [],
         "tool_calls": [],
+        "feedback": "",
         "verification": None,
         "needs_replan": False,
+        "done": False,
         "final_answer": None,
         "status": "pending",
         "cost_metrics": {
-            "kimi_input_tokens": 0, "kimi_output_tokens": 0,
-            "deepseek_input_tokens": 0, "deepseek_output_tokens": 0,
-            "total_cost_usd": 0.0, "tool_calls": 0,
+            "kimi_input_tokens": 0,
+            "kimi_output_tokens": 0,
+            "deepseek_input_tokens": 0,
+            "deepseek_output_tokens": 0,
+            "total_cost_usd": 0.0,
+            "tool_calls": 0,
         },
         "planning_iterations": 0,
         "scratchpad": "",
@@ -68,7 +71,12 @@ async def stream_task_events(
 
             # Customize event types for frontend consumption
             if event_type == "planner":
-                yield {"type": "planner_output", "content": node_output.get("plan"), "timestamp": datetime.now(timezone.utc).isoformat()}
+                yield {
+                    "type": "planner_output", 
+                    "content": node_output.get("plan"), 
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "tool": node_output.get("tool","")
+                }
             elif event_type == "executor":
                 # Executor output contains results from steps
                 results = node_output.get("results", [])
