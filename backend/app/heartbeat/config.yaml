@@ -31,27 +31,28 @@ probes:
     expected_status: 200
 
 policy_rules:
-  - name: "new_court_filing"
-    condition: "probes.court_roll_rss.status == 200 AND probes.shared_drive_scan.new_files > 0"
-    action: "MemoryIngestTask"
-    priority: high
-
-  - name: "queue_backlog"
-    condition: "probes.document_queue_depth.depth > probes.document_queue_depth.threshold"
-    action: "EscalateToLLM"
+  - name: critical_http_service_down
+    condition:
+      and:
+        - ==:
+            - http_service_probe.status
+            - "critical"
+        - ==:
+            - http_service_probe.actual_status
+            - 500
+    action: notify_on_call_devops
     priority: critical
-
-  - name: "database_down"
-    condition: "probes.case_database_health.status != 200"
-    action: "AlertAdmin"
+  - name: high_document_queue_warning
+    condition:
+      >:
+        - document_ingest_queue.depth
+        - 80
+    action: scale_ingest_workers
+    priority: warn
+  - name: file_not_modified_alert
+    condition:
+      >:
+        - critical_file_monitor.age_seconds
+        - 3600 # 1 hour
+    action: investigate_file_stale
     priority: critical
-
-escalation:
-  llm_threshold: "ambiguous_or_conflicting"
-  max_escalations_per_hour: 10
-
-authorized_actions:
-  - MemoryIngestTask
-  - DocumentClassificationTask
-  - AlertAdmin
-  # All other actions require human approval

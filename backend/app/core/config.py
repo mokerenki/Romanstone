@@ -44,7 +44,7 @@ class MemoryConfig:
     qdrant_port: int = 6333
     kuzu_db_path: str = "/tmp/aether/kuzu.db"
     graphiti_enabled: bool = False
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://redis:6379/0"
 
 
 @dataclass(frozen=True)
@@ -104,7 +104,7 @@ class AetherConfig:
         qdrant_port=int(os.getenv("QDRANT_PORT", "6333")),
         kuzu_db_path=os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
         graphiti_enabled=os.getenv("GRAPHITI_ENABLED", "false").lower() == "true",
-        redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+        redis_url=os.getenv("REDIS_URL", "redis://redis:6379/0"),
     ))
 
     sandbox: SandboxConfig = field(default_factory=lambda: SandboxConfig(

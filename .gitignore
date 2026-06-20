@@ -29,3 +29,24 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Python virtual environments (both common names)
+.venv/
+
+# Pytest cache and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated filetree (5MB file currently committed)
+filetree.txt
+
+# KuzuDB and temp data
+/tmp/
+
+# Docker
+.docker/
+
+# Build artifacts
+dist/
+build/
