@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -33,15 +31,6 @@ services:
     networks:
       - aether_network
 
-  kuzu:
-    image: kuzu:latest # Assuming you have a KuzuDB Docker image or build it
-    ports:
-      - "7687:7687"
-    volumes:
-      - aether_kuzu:/server/data # Persistent storage for KuzuDB
-    networks:
-      - aether_network
-
   redis:
     image: redis:7-alpine
     ports:
@@ -71,7 +60,6 @@ services:
       POSTGRES_PASSWORD: aether
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ""
-      KUZU_URL: bolt://kuzu:7687
       REDIS_URL: redis://redis:6379/0
       KIMI_K2_MODEL: ${KIMI_K2_MODEL}
       KIMI_BASE_URL: ${KIMI_BASE_URL}
@@ -91,8 +79,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kuzu:
-        condition: service_started # Kuzu doesn't have a healthcheck in this image
     volumes:
       - aether_kuzu:/tmp/aether # Persistent storage for KuzuDB
       - aether_sandbox:/tmp/aether/sandbox # For Python REPL sandbox

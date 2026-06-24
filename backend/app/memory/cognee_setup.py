@@ -16,7 +16,7 @@ from openai import AsyncOpenAI # Or your preferred LLM client
 
 # Local imports
 from app.memory.graph_setup import KuzuGraph
-from app.memory.legal_schema import LEGAL_SCHEMA
+from app.memory.domain_schemas import LEGAL_SCHEMA
 
 logger = structlog.get_logger("aether.memory.cognee_setup")
 

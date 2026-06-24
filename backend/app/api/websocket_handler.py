@@ -5,13 +5,17 @@ from typing import Any, Dict, AsyncGenerator
 import traceback
 
 import structlog
+from fastapi import WebSocket, WebSocketDisconnect
 from langchain_core.messages import HumanMessage
 
-# Import necessary components from your application
+from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
+from app.memory.cognee_setup import CogneeMemory
+from app.memory.retriever_tool import MemoryRetrieverTool
+from app.services.browser_automation_service import BrowserAutomationService
+from app.tools.browser_tool import BrowserTool
+from app.tools.python_repl import PythonREPLTool
+from app.tools.registry import ToolRegistry
 from app.graph import create_graph
-# from app.core.config import CONFIG # Not directly used here, but good to know it's available
-# from app.core.model_router import ModelRouter # Passed as argument
-# from app.tools.registry import ToolRegistry # Passed as argument
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -21,14 +25,20 @@ async def stream_task_events(
     tenant_id: str,
     thread_id: str,
     checkpointer: Any,
-    model_router: Any,
-    tool_registry: Any,
+    model_router: KimiDeepSeekRouter,
+    browser_service: BrowserAutomationService,
+    tool_registry: ToolRegistry,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     task_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
     # Create the graph instance for this task
     graph = create_graph(model_router, tool_registry, checkpointer)
+
+    # Potential integration point for browser service in the future
+    if browser_service:
+        # Example: TODO wire browser_service into the tool registry or task context
+        logger.debug("websocket_handler.browser_service_available")
 
     initial_state = {
         "task_id": task_id,
@@ -102,3 +112,49 @@ async def stream_task_events(
             "trace": traceback.format_exc().splitlines()[-5:],
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+
+async def websocket_endpoint(
+    websocket: WebSocket,
+    cognee_memory: CogneeMemory,
+    checkpointer: Any,
+    model_router: KimiDeepSeekRouter,
+    browser_service: BrowserAutomationService,
+):
+    await websocket.accept()
+    client_id = str(uuid.uuid4())
+    logger.info("websocket.connected", client_id=client_id)
+
+    tool_registry = ToolRegistry()
+    tool_registry.register(BrowserTool())
+    tool_registry.register(PythonREPLTool())
+    tool_registry.register(MemoryRetrieverTool(cognee_memory))
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            action = data.get("action")
+            if action == "run_task":
+                user_message = data.get("message", "")
+                user_id = data.get("user_id", "anonymous")
+                tenant_id = data.get("tenant_id", "default")
+                thread_id = data.get("thread_id") or str(uuid.uuid4())
+
+                async for event in stream_task_events(
+                    user_message,
+                    user_id,
+                    tenant_id,
+                    thread_id,
+                    checkpointer,
+                    model_router,
+                    browser_service,
+                    tool_registry,
+                ):
+                    await websocket.send_json(event)
+            elif action == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        logger.info("websocket.disconnected", client_id=client_id)
+    except Exception as exc:
+        logger.exception("websocket.error", client_id=client_id, error=str(exc))
+        await websocket.send_json({"type": "error", "message": str(exc)})

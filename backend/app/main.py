@@ -40,12 +40,11 @@ async def lifespan(app: FastAPI):
     logger.info("model_router.initialized")
 
     # Initialize Cognee Memory
-    app.state.cognee_memory = CogneeMemory(
-        qdrant_url=settings.QDRANT_URL,
-        qdrant_api_key=settings.QDRANT_API_KEY,
-        kuzu_url=settings.KUZU_URL,
-        llm_router=app.state.model_router
-    )
+    app.state.cognee_memory = CogneeMemory(config={
+        "qdrant_host": os.getenv("QDRANT_HOST", "qdrant"),
+        "qdrant_port": int(os.getenv("QDRANT_PORT", "6333")),
+        "kuzu_db_path": os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
+    })
     await app.state.cognee_memory.initialize()
     memory_api_router.cognee_memory = app.state.cognee_memory # Inject memory into router
     logger.info("cognee_memory.initialized")

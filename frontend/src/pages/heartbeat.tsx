@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import YAML from 'js-yaml'; // npm install js-yaml
-import { CodeMirror, basicSetup } from '@uiw/react-codemirror'; // npm install @uiw/react-codemirror  
-import { yaml } from '@codemirror/lang-yaml'; // npm install @codemirror/lang-yaml
+import YAML from 'js-yaml';
+import CodeMirror, { basicSetup } from '@uiw/react-codemirror';
+import { yaml } from '@codemirror/lang-yaml';
 
 // Define a basic schema for validation (can be more detailed)
 const heartbeatConfigSchema = yup.object().shape({
@@ -160,7 +160,7 @@ export default function HeartbeatPage() {
                 <CodeMirror
                   value={configYaml}
                   height="400px"
-                  extensions={[basicSetup, yaml()]}
+                  extensions={[basicSetup(), yaml()]}
                   onChange={onYamlChange}
                   theme="dark"
                 />

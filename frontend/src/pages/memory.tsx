@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ForceGraph2D } from 'react-force-graph'; // npm install react-force-graph
-import { useQuery } from 'react-query'; // npm install react-query
+import { useQuery } from '@tanstack/react-query'; // npm install @tanstack/react-query
 import DatePicker from 'react-datepicker'; // npm install react-datepicker
 import 'react-datepicker/dist/react-datepicker.css';
 import { useForm, Controller } from 'react-hook-form';

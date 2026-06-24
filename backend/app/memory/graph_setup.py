@@ -4,7 +4,7 @@ import structlog
 import os
 import json
 
-from app.memory.legal_schema import LEGAL_SCHEMA
+from app.memory.domain_schemas import LEGAL_SCHEMA
 
 logger = structlog.get_logger("aether.memory.graph_setup")
 
