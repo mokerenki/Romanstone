@@ -2,6 +2,7 @@ import httpx
 import os
 import glob
 import asyncio
+import time
 import psutil # For robust process monitoring
 import aioredis # For robust queue monitoring
 from typing import Any, Dict, List, Optional
@@ -35,10 +36,10 @@ class HTTPProbe(BaseProbe):
             return {"status": "error", "message": "URL not configured", "probe_name": self.name}
 
         try:
-            start_time = asyncio.get_event_loop().time()
+            start_time = time.perf_counter()
             async with httpx.AsyncClient(verify=verify_ssl ) as client:
                 response = await client.request(method, url, headers=headers, json=data, timeout=timeout)
-            end_time = asyncio.get_event_loop().time()
+            end_time = time.perf_counter()
             latency_ms = (end_time - start_time) * 1000
 
             status_ok = response.status_code == expected_status

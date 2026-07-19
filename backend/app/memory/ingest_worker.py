@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import traceback
 import structlog
-import aioredis
+import redis.asyncio as aioredis
 import os
 
 from app.memory.cognee_setup import CogneeMemory
@@ -35,7 +35,7 @@ class MemoryIngestWorker:
 
         logger.info("memory_ingest_worker.starting", consumer_name=self.consumer_name)
         self._running = True
-        self.redis_client = await aioredis.from_url(self.redis_url)
+        self.redis_client = aioredis.from_url(self.redis_url)
         
         # Initialize CogneeMemory for this worker instance.
         # Use a shared KuzuDB path for all backend processes by default.
@@ -117,7 +117,19 @@ class MemoryIngestWorker:
                 logger.info("memory_ingest_worker.event_acknowledged", message_id=message_id.decode(), event_id=event_id, consumer=self.consumer_name)
 
 
-# Entry point for running the worker as a standalone process
+async def run_worker():
+    worker = MemoryIngestWorker()
+    try:
+        await worker.start()
+    except asyncio.CancelledError:
+        pass
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        logger.critical("memory_ingest_worker.main_error", error=str(e), exc_info=True)
+    finally:
+        await worker.stop()
+
 if __name__ == "__main__":
     # Basic setup for structlog in standalone worker
     structlog.configure(
@@ -132,10 +144,9 @@ if __name__ == "__main__":
         cache_logger_on_first_use=True,
     )
     
-    worker = MemoryIngestWorker()
     try:
-        asyncio.run(worker.start())
+        asyncio.run(run_worker())
     except KeyboardInterrupt:
-        asyncio.run(worker.stop())
+        pass
     except Exception as e:
         logger.critical("memory_ingest_worker.main_error", error=str(e), exc_info=True)

@@ -15,6 +15,8 @@ from app.services.browser_automation_service import BrowserAutomationService
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.tools.registry import ToolRegistry
+from app.agents.router import DomainRouter
+from app.mcp_clients import MCPRegistry
 from app.graph import create_graph
 
 logger = structlog.get_logger("aether.websocket_handler")
@@ -28,12 +30,13 @@ async def stream_task_events(
     model_router: KimiDeepSeekRouter,
     browser_service: BrowserAutomationService,
     tool_registry: ToolRegistry,
+    domain_router: DomainRouter,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     task_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
     # Create the graph instance for this task
-    graph = create_graph(model_router, tool_registry, checkpointer)
+    graph = create_graph(model_router, domain_router, tool_registry, checkpointer)
 
     # Potential integration point for browser service in the future
     if browser_service:
@@ -130,6 +133,9 @@ async def websocket_endpoint(
     tool_registry.register(PythonREPLTool())
     tool_registry.register(MemoryRetrieverTool(cognee_memory))
 
+    mcp_registry = MCPRegistry(cognee_memory)
+    domain_router = DomainRouter(model_router, mcp_registry)
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -149,6 +155,7 @@ async def websocket_endpoint(
                     model_router,
                     browser_service,
                     tool_registry,
+                    domain_router,
                 ):
                     await websocket.send_json(event)
             elif action == "ping":

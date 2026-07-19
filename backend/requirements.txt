@@ -16,6 +16,7 @@ langgraph>=1.2.0
 langchain>=0.3.0
 langchain-core>=0.3.0
 openai>=1.50.0
+mcp>=1.0.0
 
 # ── Database & Checkpointing ───────────────────────────────────
 psycopg[binary]>=3.2.0

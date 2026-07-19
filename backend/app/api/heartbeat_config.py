@@ -10,7 +10,8 @@ from app.heartbeat.daemon import heartbeat_daemon
 logger = structlog.get_logger("aether.api.heartbeat_config")
 router = APIRouter()
 
-CONFIG_FILE = "app/heartbeat/config.yaml"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_FILE = os.path.join(BASE_DIR, "heartbeat", "config.yaml")
 
 @router.get("/heartbeat/config", response_model=Dict[str, Any])
 async def get_heartbeat_config() -> Dict[str, Any]:

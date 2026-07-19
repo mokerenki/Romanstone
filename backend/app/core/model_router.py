@@ -271,7 +271,7 @@ class ModelRouter:
             return await client.chat(messages, system_prompt, temperature, max_tokens)
         except Exception as e:
             if role == self.ROLE_PLANNING:
-                logger.warning("model_router.fallback: %s", e)
+                logger.warning("model_router.fallback", error=str(e))
                 return await self._deepseek.chat(messages, system_prompt, temperature, max_tokens)
             raise
 

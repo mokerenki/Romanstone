@@ -14,7 +14,10 @@ logger = structlog.get_logger("aether.heartbeat.daemon")
 class HeartbeatDaemon:
     """Implements the 5-stage heartbeat pipeline: Scheduler → Deterministic Probes → Policy Engine → Escalation Gate → Distributed Action Dispatcher."""
 
-    def __init__(self, config_path: str = "app/heartbeat/config.yaml"):
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            config_path = os.path.join(base_dir, "heartbeat", "config.yaml")
         self.config_path = config_path
         self._running = False
         self.scheduler = AsyncIOScheduler(timezone="UTC") # Always use UTC for internal scheduling

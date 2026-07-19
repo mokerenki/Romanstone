@@ -1,0 +1,40 @@
+# Each entry is an MCP server endpoint.
+# For local servers, use http://localhost:port/sse
+# For cloud MCP services (like Google Maps, BigQuery), use their provided URLs.
+
+salesforce:
+  url: "https://your-mcp-gateway/salesforce/sse"
+  headers:
+    Authorization: "Bearer ${SALESFORCE_ACCESS_TOKEN}"
+  timeout: 30.0
+
+slack:
+  url: "https://your-mcp-gateway/slack/sse"
+  headers:
+    Authorization: "Bearer ${SLACK_BOT_TOKEN}"
+
+whatsapp:
+  url: "https://your-whatsapp-mcp-server/sse"   # or a local endpoint
+  headers:
+    X-API-Key: "${WHATSAPP_API_KEY}"
+
+# Google services – you can use Google's official MCP endpoints:
+google_maps:
+  url: "https://mapstools.googleapis.com/mcp"
+  headers:
+    X-Goog-Api-Key: "${MAPS_API_KEY}"
+
+google_bigquery:
+  url: "https://bigquery.googleapis.com/mcp"
+  headers:
+    Authorization: "Bearer ${GCP_OAUTH_TOKEN}"   # Or use service account key
+
+  class MCPClient:
+    def __init__(self, name, url, headers_provider=None, ...):
+        self._headers_provider = headers_provider
+        ...
+
+    async def _get_headers(self):
+        if callable(self._headers_provider):
+            return await self._headers_provider()
+        return self.headers

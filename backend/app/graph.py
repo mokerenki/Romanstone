@@ -1,16 +1,23 @@
 from langgraph.graph import StateGraph, END
-from app.agents.planner import PlannerNode
+from app.agents.planner import Planner
 from app.agents.executor import ExecutorNode
-from app.agents.verifier import VerifierNode
-from app.core.model_router import ModelRouter
+from app.agents.verifier import Verifier
+from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.tools.registry import ToolRegistry
+from app.agents.router import DomainRouter
 
-def create_graph(router: ModelRouter, registry: ToolRegistry, checkpointer=None):
+def create_graph(
+    router: KimiDeepSeekRouter,
+    domain_router: DomainRouter,
+    registry: ToolRegistry,
+    checkpointer=None
+):
     graph = StateGraph(dict)
 
-    planner = PlannerNode(router, registry)
+    # Planner now receives domain_router
+    planner = Planner(router, domain_router, registry)
     executor = ExecutorNode(registry, router)
-    verifier = VerifierNode(router)
+    verifier = Verifier(router)
 
     graph.add_node("planner", planner)
     graph.add_node("executor", executor)

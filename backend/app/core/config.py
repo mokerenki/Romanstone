@@ -33,7 +33,7 @@ class DBConfig:
 
     @property
     def async_url(self) -> str:
-        return f"postgresql+psycopg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
 
 
 @dataclass(frozen=True)

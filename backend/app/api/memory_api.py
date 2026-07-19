@@ -1,6 +1,7 @@
 import json
 import structlog
 from typing import Any, Dict, Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -43,14 +44,21 @@ async def search_memory(request: Dict[str, Any]):
     try:
         logger.info("memory_api.search_initiated", mode=mode, query=query[:50])
         
-        result = await cognee_memory.search(
-            query=query,
-            mode=mode,
-            top_k=int(top_k) if top_k is not None else 5,
-            entity_label=entity_label,
-            entity_id=entity_id,
-            query_time=query_time
-        )
+        kwargs = {
+            "query": query,
+            "mode": mode,
+            "top_k": int(top_k) if top_k is not None else 5,
+            "entity_label": entity_label,
+            "entity_id": entity_id,
+        }
+        if mode == "temporal":
+            if not entity_label or not entity_id or not query_time:
+                raise HTTPException(status_code=400, detail="entity_label, entity_id, and query_time are required for temporal mode.")
+            if isinstance(query_time, str):
+                query_time = datetime.fromisoformat(query_time.replace("Z", "+00:00"))
+            kwargs["query_time"] = query_time
+        
+        result = await cognee_memory.search(**kwargs)
         
         logger.info("memory_api.search_completed", mode=mode, result_count=len(result.get("results", [])))
         return result

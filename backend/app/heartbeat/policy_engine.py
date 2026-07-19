@@ -1,8 +1,53 @@
 from typing import Any, Dict, List
 import structlog
-import json # For safe evaluation
+import json
+import ast
+import operator
 
 logger = structlog.get_logger("aether.heartbeat.policy_engine")
+
+COMPARISON_OPS = {
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+}
+
+def _safe_eval_node(node, variables):
+    if isinstance(node, ast.Expression):
+        return _safe_eval_node(node.body, variables)
+    elif isinstance(node, ast.Compare):
+        left = _safe_eval_node(node.left, variables)
+        right = _safe_eval_node(node.comparators[0], variables)
+        op_type = type(node.ops[0])
+        if op_type not in COMPARISON_OPS:
+            raise ValueError(f"Unsupported operator: {op_type.__name__}")
+        return COMPARISON_OPS[op_type](left, right)
+    elif isinstance(node, ast.Constant):
+        return node.value
+    elif isinstance(node, ast.Name):
+        if node.id in variables:
+            return variables[node.id]
+        raise ValueError(f"Unknown variable: {node.id}")
+    elif isinstance(node, ast.Attribute):
+        parts = []
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name):
+            parts.append(node.id)
+        key = ".".join(reversed(parts))
+        if key in variables:
+            return variables[key]
+        raise ValueError(f"Unknown variable: {key}")
+    else:
+        raise ValueError(f"Unsupported expression: {type(node).__name__}")
+
+def safe_eval_condition(condition_str, variables):
+    tree = ast.parse(condition_str, mode='eval')
+    return _safe_eval_node(tree, variables)
 
 class PolicyEngine:
     """Evaluates YAML-based rules against probe results to determine severity and actions."""
@@ -40,25 +85,7 @@ class PolicyEngine:
                 continue
 
             try:
-                # Safely evaluate the condition string
-                # WARNING: Using eval() is dangerous. For production, a dedicated rule engine library
-                # or a more sophisticated parser should be used to prevent arbitrary code execution.
-                # For this guide, we'll use a simplified approach assuming trusted input.
-                
-                # Replace placeholders in condition string with actual values
-                formatted_condition = condition_str
-                for key, value in flat_results.items():
-                    # Handle string values by quoting them in the condition
-                    if isinstance(value, str):
-                        formatted_condition = formatted_condition.replace(key, json.dumps(value))
-                    else:
-                        formatted_condition = formatted_condition.replace(key, str(value))
-                
-                # Basic check for common comparison operators to ensure it's an expression
-                if any(op in formatted_condition for op in ['==', '!=', '>', '<', '>=', '<=']):
-                    condition_met = eval(formatted_condition, {"__builtins__": {}}, flat_results)
-                else:
-                    condition_met = False # If no operator, assume not a valid condition for eval
+                condition_met = safe_eval_condition(condition_str, flat_results)
 
                 if condition_met:
                     evaluated_decision["severity"] = priority

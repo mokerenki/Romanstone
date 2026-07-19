@@ -6,20 +6,22 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from starlette.websockets import WebSocketDisconnect
 
-import aioredis
+import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, WebSocket
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.memory import MemorySaver
 
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.api.websocket_handler import stream_task_events
 
 from app.core.config import CONFIG
-from app.core.model_router import ModelRouter
+from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
+from app.core.redis_checkpointer import RedisCheckpointer
 from app.tools.registry import ToolRegistry
+from app.agents.router import DomainRouter
+from app.mcp_clients import MCPRegistry
 from app.graph import create_graph
 
 from app.memory.cognee_setup import CogneeMemory
@@ -29,11 +31,18 @@ logger = structlog.get_logger("aether.api")
 router = APIRouter()
 
 redis_client: Optional[aioredis.Redis] = None
+_checkpointer_instance: Optional[RedisCheckpointer] = None
 
-# Lazy init (replace with Postgres checkpointer in production)
-_checkpointer = MemorySaver()
-_router = ModelRouter()
-_registry = ToolRegistry()  # TODO: populate with actual tools
+def get_checkpointer() -> RedisCheckpointer:
+    global _checkpointer_instance
+    if _checkpointer_instance is None:
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        _checkpointer_instance = RedisCheckpointer(aioredis.from_url(redis_url))
+    return _checkpointer_instance
+
+_checkpointer = get_checkpointer()
+_router = KimiDeepSeekRouter()
+_registry = ToolRegistry()
 _registry.register(BrowserTool())
 _registry.register(PythonREPLTool())
 
@@ -48,13 +57,17 @@ _cognee_memory = CogneeMemory(config={
 _memory_retriever_tool = MemoryRetrieverTool(_cognee_memory)
 _registry.register(_memory_retriever_tool)
 
+_mcp_registry = MCPRegistry(_cognee_memory)
+_domain_router = DomainRouter(_router, _mcp_registry)
+
 async def get_redis_client() -> aioredis.Redis:
     """Provides a globally managed Redis client instance."""
+    global redis_client
     if redis_client is None:
-        # This should ideally be initialized via FastAPI lifespan events
-        # For standalone testing, you might initialize here, but not recommended for production
+        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
         logger.warning("redis_client.not_initialized_via_lifespan", message="Initializing Redis client directly. Ensure this is managed by FastAPI lifespan in production.")
-        return await aioredis.from_url("redis://redis:6379/0")
+        redis_client = aioredis.from_url(redis_url)
+        await redis_client.ping()
     return redis_client
 
 async def create_proactive_task_to_queue(task_description: str, context: str = "", user_id: str = "heartbeat", tenant_id: str = "default", priority: str = "medium", action_type: str = "proactive_monitoring") -> Dict[str, Any]:
@@ -105,7 +118,7 @@ async def create_task(request: Dict[str, Any]):
 
     from app.graph import create_graph
 
-    graph = create_graph(_router, _registry, _checkpointer)
+    graph = create_graph(_router, _domain_router, _registry, _checkpointer)
 
     initial_state = {
         "task_id": task_id,"task": user_message, "user_id": user_id, "tenant_id": tenant_id,

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -16,7 +17,7 @@ from openai import AsyncOpenAI # Or your preferred LLM client
 
 # Local imports
 from app.memory.graph_setup import KuzuGraph
-from app.memory.domain_schemas import LEGAL_SCHEMA
+from app.memory.domain_schemas import PERSONAL_ASSISTANCE_SCHEMA
 
 logger = structlog.get_logger("aether.memory.cognee_setup")
 
@@ -26,6 +27,7 @@ class CogneeMemory:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self._initialized = False
+        self._schema = self.config.get("schema", PERSONAL_ASSISTANCE_SCHEMA)
         
         self.qdrant_client: Optional[QdrantClient] = None
         self.kuzu_graph: Optional[KuzuGraph] = None
@@ -56,13 +58,17 @@ class CogneeMemory:
             # Initialize KuzuDB Graph
             kuzu_db_path = self.config.get("kuzu_db_path", "/tmp/aether/kuzu.db")
             self.kuzu_graph = KuzuGraph(db_path=kuzu_db_path)
-            self.kuzu_graph.initialize() # This will create schema based on LEGAL_SCHEMA
+            self.kuzu_graph.initialize(schema=self._schema) # Pass schema to graph setup
             logger.info("kuzu_graph.initialized", db_path=kuzu_db_path)
 
             # Initialize OpenAI Client (for embeddings and entity extraction)
+            openai_api_key = os.environ.get("OPENAI_API_KEY")
+            if not openai_api_key:
+                raise RuntimeError("OPENAI_API_KEY is required for CogneeMemory embeddings and entity extraction.")
+            openai_api_base = os.environ.get("OPENAI_API_BASE")
             self.openai_client = AsyncOpenAI(
-                api_key=os.environ.get("OPENAI_API_KEY"),
-                base_url=os.environ.get("OPENAI_API_BASE") # Use custom base_url if configured
+                api_key=openai_api_key,
+                base_url=openai_api_base # Use custom base_url if configured
             )
             logger.info("openai.client_initialized")
 
@@ -130,8 +136,8 @@ class CogneeMemory:
             raise
 
     async def _extract_entities_and_relationships_llm(self, text: str) -> Dict[str, Any]:
-        """Extracts entities and relationships from text using an LLM, guided by LEGAL_SCHEMA."""
-        schema_description = json.dumps(LEGAL_SCHEMA, indent=2)
+        """Extracts entities and relationships from text using an LLM, guided by the configured schema."""
+        schema_description = json.dumps(self._schema, indent=2)
         prompt = f"""You are an expert knowledge graph extractor. Your task is to identify entities and relationships from the provided text based on the following schema. 
         Extract only entities and relationships explicitly defined in the schema. If an entity or relationship type is not in the schema, do not extract it.
         
@@ -213,7 +219,6 @@ class CogneeMemory:
                 properties["valid_to"] = properties.get("valid_to", datetime.max.replace(tzinfo=timezone.utc).isoformat())
                 # Need to infer source/target labels from schema or by querying Kuzu
                 # For simplicity, assuming source/target IDs directly map to node IDs and labels are known
-                # A more robust solution would query Kuzu for node labels based on IDs
                 source_label = self._get_entity_label_from_id(source_id) # Helper needed
                 target_label = self._get_entity_label_from_id(target_id) # Helper needed
                 if source_label and target_label:
@@ -225,7 +230,8 @@ class CogneeMemory:
         """Helper to infer entity label from its ID, potentially by querying Kuzu or checking schema."""
         # This is a simplification. In a real system, you might query KuzuDB
         # or maintain a mapping of ID patterns to labels.
-        for label, schema_def in LEGAL_SCHEMA["entities"].items():
+        for entity_def in self._schema.get("entities", []):
+            label = entity_def.get("label", "")
             # Simple heuristic: if ID contains a known entity type prefix
             if label.upper() in entity_id.upper():
                 return label
@@ -280,3 +286,21 @@ class CogneeMemory:
         
         else:
             raise ValueError(f"Unsupported memory retrieval mode: {mode}")
+
+    async def close(self):
+        """Closes all client connections."""
+        if self.qdrant_client:
+            # QdrantClient doesn't have an async close in all versions, but let's try
+            try:
+                self.qdrant_client.close()
+            except Exception:
+                pass
+        if self.kuzu_graph and self.kuzu_graph.conn:
+            try:
+                self.kuzu_graph.conn.close()
+            except Exception:
+                pass
+        if self.openai_client:
+            await self.openai_client.close()
+        self._initialized = False
+        logger.info("cognee_memory.closed")

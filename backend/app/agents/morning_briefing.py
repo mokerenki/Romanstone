@@ -53,9 +53,8 @@ class MorningBriefingOrchestrator:
         Queries memory for today's scheduled tasks and appointments.
         """
         today = datetime.now().strftime("%Y-%m-%d")
-        # Example: Temporal search for events today
-        query = f"tasks or appointments scheduled for {today}"
-        results = await self.cognee_memory.search(query=query, mode="temporal", query_time=today, top_k=5)
+        today_start = datetime.strptime(today, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        results = await self.cognee_memory.search(query="tasks or appointments", mode="temporal", query_time=today_start, top_k=5)
         logger.debug("morning_briefing.todays_schedule_found", count=len(results.get("results", [])))
         return results.get("results", [])
 
@@ -73,10 +72,8 @@ class MorningBriefingOrchestrator:
         """
         Queries memory for recent changes since the previous day.
         """
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        # Example: Temporal search for events since yesterday
-        query = f"all events and changes since {yesterday}"
-        results = await self.cognee_memory.search(query=query, mode="temporal", query_time=yesterday, top_k=10)
+        yesterday = (datetime.now() - timedelta(days=1)).replace(tzinfo=timezone.utc)
+        results = await self.cognee_memory.search(query="recent events and changes", mode="temporal", query_time=yesterday, top_k=10)
         logger.debug("morning_briefing.recent_changes_found", count=len(results.get("results", [])))
         return results.get("results", [])
 

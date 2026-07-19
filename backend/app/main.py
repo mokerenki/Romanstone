@@ -4,7 +4,17 @@ import structlog
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from app.core import instances
+
+instances.tool_registry = app.state.tool_registry
+instances.mcp_registry = app.state.mcp_registry
+instances.domain_router = app.state.domain_router
+instances.model_router = app.state.model_router
+instances.checkpointer = app.state.checkpointer
+
+
+import redis.asyncio as aioredis
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -17,6 +27,13 @@ from app.core.redis_checkpointer import RedisCheckpointer
 from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
+from app.mcp_clients.mcp_registry import MCPRegistry
+from app.agents.router import DomainRouter
+from app.tools.registry import ToolRegistry
+from app.tools.browser_tool import BrowserTool
+from app.tools.python_repl import PythonREPLTool
+from app.tools.whatsapp_tool import WhatsAppTool
+from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
 
 logger = structlog.get_logger("aether.main")
@@ -31,7 +48,7 @@ async def lifespan(app: FastAPI):
     logger.info("application.startup")
 
     # Initialize Redis client for checkpointer and task queue
-    app.state.redis_client = await settings.get_redis_client()
+    app.state.redis_client = aioredis.from_url(settings.redis_url)
     await app.state.redis_client.ping()
     logger.info("redis.connected")
 
@@ -46,12 +63,12 @@ async def lifespan(app: FastAPI):
         "kuzu_db_path": os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
     })
     await app.state.cognee_memory.initialize()
-    memory_api_router.cognee_memory = app.state.cognee_memory # Inject memory into router
+    memory_api_router.cognee_memory = app.state.cognee_memory
     logger.info("cognee_memory.initialized")
 
     # Initialize Redis Checkpointer
     app.state.checkpointer = RedisCheckpointer(app.state.redis_client)
-    tasks_router.checkpointer = app.state.checkpointer # Inject checkpointer into tasks router
+    tasks_router.checkpointer = app.state.checkpointer
     logger.info("checkpointer.initialized")
 
     # Initialize Browser Automation Service
@@ -59,7 +76,31 @@ async def lifespan(app: FastAPI):
     await app.state.browser_service.start()
     logger.info("browser_service.initialized")
 
-    # Initialize Proactive Scheduler
+    # ------------------- TOOL REGISTRY & MCP -------------------
+    # 1. Create the central tool registry
+    app.state.tool_registry = ToolRegistry()
+
+    # 2. Register built-in tools
+    app.state.tool_registry.register(BrowserTool())
+    app.state.tool_registry.register(PythonREPLTool())
+    app.state.tool_registry.register(WhatsAppTool())
+    # Memory retriever needs the cognee_memory instance
+    app.state.tool_registry.register(MemoryRetrieverTool(app.state.cognee_memory))
+    logger.info("builtin_tools.registered")
+
+    # 3. Initialize MCP registry and register MCP tools
+    app.state.mcp_registry = MCPRegistry()
+    await app.state.mcp_registry.register_all_tools(app.state.tool_registry)
+    logger.info("mcp_tools.registered")
+
+    # 4. Create Domain Router (uses model_router and mcp_registry)
+    app.state.domain_router = DomainRouter(
+        model_router=app.state.model_router,
+        mcp_registry=app.state.mcp_registry
+    )
+    logger.info("domain_router.initialized")
+
+    # ------------------- PROACTIVE SCHEDULER -------------------
     app.state.proactive_scheduler = ProactiveScheduler(
         model_router=app.state.model_router,
         cognee_memory=app.state.cognee_memory,
@@ -70,7 +111,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Cleanup on shutdown
+    # ------------------- CLEANUP -------------------
     logger.info("application.shutdown")
     if app.state.proactive_scheduler:
         await app.state.proactive_scheduler.stop()
@@ -87,6 +128,9 @@ async def lifespan(app: FastAPI):
     if app.state.cognee_memory:
         await app.state.cognee_memory.close()
         logger.info("cognee_memory.closed")
+    if hasattr(app.state, 'mcp_registry'):
+        await app.state.mcp_registry.close_all()
+        logger.info("mcp_registry.closed")
 
 
 app = FastAPI(lifespan=lifespan,
@@ -95,28 +139,31 @@ app = FastAPI(lifespan=lifespan,
               version="0.1.0")
 
 # CORS Middleware
+cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],  # Adjust as needed for your frontend
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
- )
+)
 
 # Include API routers
 app.include_router(heartbeat_config_router)
 app.include_router(tasks_router)
 app.include_router(memory_api_router)
 
-# WebSocket endpoint
+# WebSocket endpoint – now passes tool_registry as well
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await websocket_endpoint(
         websocket,
-        app.state.cognee_memory,
-        app.state.checkpointer,
-        app.state.model_router,
-        app.state.browser_service # Pass browser service to websocket handler
+        cognee_memory=app.state.cognee_memory,
+        checkpointer=app.state.checkpointer,
+        model_router=app.state.model_router,
+        browser_service=app.state.browser_service,
+        tool_registry=app.state.tool_registry,   # <-- NEW
+        domain_router=app.state.domain_router    # <-- NEW (optional, can be used inside)
     )
 
 
@@ -131,8 +178,8 @@ async def health_check():
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException ):
-    logger.error("aether.http_exception", status_code=exc.status_code, detail=exc.detail, path=request.url.path )
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.error("aether.http_exception", status_code=exc.status_code, detail=exc.detail, path=request.url.path)
     return JSONResponse(
         status_code=exc.status_code,
         content={"message": exc.detail},
