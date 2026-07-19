@@ -19,10 +19,10 @@ whatsapp:
     X-API-Key: "${WHATSAPP_API_KEY}"
 
 # Google services – you can use Google's official MCP endpoints:
-google_maps:
-  url: "https://mapstools.googleapis.com/mcp"
-  headers:
-    X-Goog-Api-Key: "${MAPS_API_KEY}"
+google_workspace:
+  url: "https://public-sides-play.loca.lt/sse"
+  timeout: 60.0
+
 
 google_bigquery:
   url: "https://bigquery.googleapis.com/mcp"
