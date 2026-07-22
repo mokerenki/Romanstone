@@ -10,7 +10,7 @@ import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, WebSocket
 from fastapi.responses import JSONResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
 
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
@@ -198,9 +198,24 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 tenant_id = data.get("tenant_id", "default")
                 thread_id = data.get("thread_id") or str(uuid.uuid4())
 
+                # Use global instances from app.core.instances
+                from app.core import instances
+                checkpointer = instances.checkpointer
+                model_router = instances.model_router
+                tool_registry = instances.tool_registry
+                domain_router = instances.domain_router
+
+                # ✅ Now passing all 9 arguments (browser_service can be None)
                 async for event in stream_task_events(
-                    user_message, user_id, tenant_id, thread_id,
-                    _checkpointer, _router, _registry
+                    user_message,
+                    user_id,
+                    tenant_id,
+                    thread_id,
+                    checkpointer,
+                    model_router,
+                    tool_registry,
+                    domain_router,
+                    None,  # browser_service is optional
                 ):
                     await websocket.send_json(event)
             elif data.get("action") == "ping":

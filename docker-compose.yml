@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -45,6 +47,20 @@ services:
     networks:
       - aether_network
 
+  mcp-filesystem:
+    image: mcp/filesystem:latest
+    volumes:
+      - ./backend:/workspace
+    networks:
+      - aether_network
+
+  mcp-github:
+    image: mcp/github:latest
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN}
+    networks:
+      - aether_network
+
   backend:
     build:
       context: ./backend
@@ -52,7 +68,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      OPIK_API_KEY: "" 
+      OPIK_API_KEY: ""
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: aether
@@ -67,11 +83,30 @@ services:
       KIMI_API_KEY: ${KIMI_API_KEY}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-openai/gpt-oss-20b}
+      NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://integrate.api.nvidia.com/v1}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-nvidia/nv-embed-v1}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-meta/llama-3.3-70b-instruct}
       DATABASE_URL: postgresql+asyncpg://aether:aether@postgres:5432/aether
       COGNEE_ENABLED: "true"
       SANDBOX_ENABLED: "true"
       RBAC_ENABLED: "false"
-      MORNING_BRIEFING_TIME: ${MORNING_BRIEFING_TIME:-08:00}
+      MORNING_BRIEFING_TIME: ${MORNING_BRIEFING_TIME:-05:00}
+      MCP_SERVERS: >
+        {
+          "filesystem": {
+            "url": "http://mcp-filesystem:3000/sse"
+          },
+          "github": {
+            "url": "http://mcp-github:3000/sse",
+            "headers": {
+              "Authorization": "Bearer ${GITHUB_TOKEN}"
+            }
+          }
+        }
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,10 +115,10 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - aether_kuzu:/tmp/aether # Persistent storage for KuzuDB
-      - aether_sandbox:/tmp/aether/sandbox # For Python REPL sandbox
+      - aether_kuzu:/tmp/aether
+      - aether_sandbox:/tmp/aether/sandbox
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health' )"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
       timeout: 5s
       retries: 5

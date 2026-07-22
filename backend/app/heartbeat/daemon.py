@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Any, Dict, List, Optional
 import yaml
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -48,6 +49,7 @@ class HeartbeatDaemon:
             with open(self.config_path, 'r') as f:
                 new_config = yaml.safe_load(f)
             self.config = new_config
+            self.config["last_loaded_at"] = datetime.now(timezone.utc).isoformat()
             self.policy_engine.load_rules(self.config.get("policy_rules", []))
             logger.info("heartbeat.daemon.config_loaded", config_path=self.config_path)
         except FileNotFoundError:
@@ -189,3 +191,7 @@ class HeartbeatDaemon:
 
         else:
             logger.debug("heartbeat.daemon.no_escalation_or_action", probe_name=probe_name, severity=severity, action=action)
+
+
+# Global instance
+heartbeat_daemon = HeartbeatDaemon()

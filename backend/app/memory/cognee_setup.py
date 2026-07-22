@@ -1,5 +1,6 @@
 import asyncio
 import json
+from app.memory.temporal_setup import TemporalGraph
 import os
 import uuid
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ from openai import AsyncOpenAI # Or your preferred LLM client
 
 # Local imports
 from app.memory.graph_setup import KuzuGraph
-from app.memory.domain_schemas import PERSONAL_ASSISTANCE_SCHEMA
+from app.memory.domain_schemas import EXECUTIVE_SCHEMA
 
 logger = structlog.get_logger("aether.memory.cognee_setup")
 
@@ -27,16 +28,22 @@ class CogneeMemory:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self._initialized = False
-        self._schema = self.config.get("schema", PERSONAL_ASSISTANCE_SCHEMA)
+        self._schema = self.config.get("schema", EXECUTIVE_SCHEMA)
         
         self.qdrant_client: Optional[QdrantClient] = None
         self.kuzu_graph: Optional[KuzuGraph] = None
         self.openai_client: Optional[AsyncOpenAI] = None
 
         self.qdrant_collection_name = self.config.get("qdrant_collection_name", "aether_memory")
-        self.embedding_model_name = self.config.get("embedding_model_name", "text-embedding-ada-002")
-        self.llm_extraction_model_name = self.config.get("llm_extraction_model_name", "gpt-4o-mini") # For entity extraction
-        self.embedding_dim = self.config.get("embedding_dim", 1536) # Default for text-embedding-ada-002
+        self.embedding_model_name = self.config.get(
+            "embedding_model_name",
+            os.environ.get("OPENAI_EMBEDDING_MODEL", "nvidia/nv-embed-v1")
+        )
+        self.llm_extraction_model_name = self.config.get(
+            "llm_extraction_model_name",
+            os.environ.get("OPENAI_CHAT_MODEL", "meta/llama-3.3-70b-instruct")
+        )
+        self.embedding_dim = self.config.get("embedding_dim", 4096)
 
     async def initialize(self):
         """Connects to Qdrant, KuzuDB, and initializes LLM clients, setting up schemas."""
@@ -230,11 +237,10 @@ class CogneeMemory:
         """Helper to infer entity label from its ID, potentially by querying Kuzu or checking schema."""
         # This is a simplification. In a real system, you might query KuzuDB
         # or maintain a mapping of ID patterns to labels.
-        for entity_def in self._schema.get("entities", []):
-            label = entity_def.get("label", "")
+        for entity_name, entity_def in self._schema.get("entities", {}).items():
             # Simple heuristic: if ID contains a known entity type prefix
-            if label.upper() in entity_id.upper():
-                return label
+            if entity_name.upper() in entity_id.upper():
+                return entity_name
         # Fallback if not found, or query KuzuDB: MATCH (n) WHERE n.id = 'entity_id' RETURN labels(n)
         return None
 

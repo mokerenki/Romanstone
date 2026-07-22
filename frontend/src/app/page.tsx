@@ -39,8 +39,7 @@ export default function Home() {
   useEffect(() => {
     const connectWebSocket = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//localhost:8000/api/ws/${client_id}`);
-
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/${clientId}`;
       ws.onopen = () => {
         console.log("WebSocket connected");
       };

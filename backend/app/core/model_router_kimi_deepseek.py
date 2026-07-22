@@ -11,6 +11,7 @@ DeepSeek:   unchanged
 
 import asyncio
 import dataclasses
+import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -212,39 +213,114 @@ class DeepSeekClient(BaseModelClient):
         )
 
 
+class NvidiaClient(BaseModelClient):
+    async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
+        start = time.perf_counter()
+        payload_messages = []
+        if system_prompt:
+            payload_messages.append({"role": "system", "content": str(system_prompt)})
+        for msg in messages:
+            payload_messages.append({
+                "role": str(msg.get("role", "user")),
+                "content": str(msg.get("content", ""))
+            })
+
+        payload = {
+            "model": str(self.config.model),
+            "messages": payload_messages,
+            "stream": False,
+        }
+
+        temp = temperature if temperature is not None else self.config.temperature
+        if temp is not None:
+            payload["temperature"] = temp
+        max_t = max_tokens if max_tokens is not None else self.config.max_tokens
+        if max_t is not None:
+            payload["max_tokens"] = int(max_t)
+
+        resp = await self._client.post("/chat/completions", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+
+        usage = self._parse_usage(data)
+        latency = (time.perf_counter() - start) * 1000
+
+        message = data["choices"][0]["message"]
+        content = message.get("content", "")
+        reasoning = message.get("reasoning_content")
+
+        logger.info("nvidia.complete", model=payload["model"],
+                    input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
+                    latency_ms=round(latency, 2), has_reasoning=bool(reasoning))
+
+        return ModelResponse(
+            content=content,
+            model=payload["model"], provider="nvidia",
+            usage=usage, latency_ms=latency, raw=data,
+        )
+
+
 class ModelRouter:
     ROLE_PLANNING = "planning"
     ROLE_VERIFICATION = "verification"
     ROLE_FALLBACK = "fallback"
 
     def __init__(self):
-        # -------------------------------------------------------
-        # Kimi model configuration - uses kimi-latest by default.
-        # You can override via environment: KIMI_MODEL=kimi-latest
-        # -------------------------------------------------------
-        kimi_cfg = CONFIG.kimi_k2
-        if not kimi_cfg.model:
-            logger.info("model_router.using_default_kimi_model", model="kimi-latest")
-            kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-latest")
+        nvidia_api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
+        nvidia_model = os.environ.get("NVIDIA_MODEL", "openai/gpt-oss-20b").strip()
+        nvidia_base_url = os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").strip()
 
-        self._kimi = KimiK2Client(kimi_cfg)
-        logger.info("model_router.kimi_config",
-                    model=kimi_cfg.model,
-                    base_url=kimi_cfg.base_url,
-                    api_key_preview=kimi_cfg.api_key[:8] + "..." if kimi_cfg.api_key else "<empty>")
-        ds_cfg = CONFIG.deepseek
-        if not ds_cfg.model or "flash" in ds_cfg.model.lower():
-            logger.info("model_router.fixing_deepseek_model", old=ds_cfg.model, new="deepseek-chat")
-            ds_cfg = dataclasses.replace(ds_cfg, model="deepseek-chat")
-        self._deepseek = DeepSeekClient(ds_cfg)
+        if nvidia_api_key:
+            nvidia_cfg = ModelConfig(
+                provider="nvidia",
+                api_key=nvidia_api_key,
+                base_url=nvidia_base_url,
+                model=nvidia_model,
+                temperature=1.0,
+                max_tokens=4096,
+            )
+            self._nvidia = NvidiaClient(nvidia_cfg)
+            logger.info("model_router.nvidia_config",
+                        model=nvidia_cfg.model,
+                        base_url=nvidia_cfg.base_url,
+                        api_key_preview=nvidia_cfg.api_key[:8] + "...")
+            planning_client = self._nvidia
+            verification_client = self._nvidia
+            fallback_client = self._nvidia
+        else:
+            self._nvidia = None
+            # -------------------------------------------------------
+            # Kimi model configuration - uses kimi-latest by default.
+            # You can override via environment: KIMI_MODEL=kimi-latest
+            # -------------------------------------------------------
+            kimi_cfg = CONFIG.kimi_k2
+            if not kimi_cfg.model:
+                logger.info("model_router.using_default_kimi_model", model="kimi-latest")
+                kimi_cfg = dataclasses.replace(kimi_cfg, model="kimi-latest")
+
+            planning_client = KimiK2Client(kimi_cfg)
+            logger.info("model_router.kimi_config",
+                        model=kimi_cfg.model,
+                        base_url=kimi_cfg.base_url,
+                        api_key_preview=kimi_cfg.api_key[:8] + "..." if kimi_cfg.api_key else "<empty>")
+
+            ds_cfg = CONFIG.deepseek
+            if ds_cfg.model and "flash" in ds_cfg.model.lower():
+                logger.info("model_router.fixing_deepseek_model", old=ds_cfg.model, new="deepseek-chat")
+                ds_cfg = dataclasses.replace(ds_cfg, model="deepseek-chat")
+            verification_client = DeepSeekClient(ds_cfg)
+            fallback_client = verification_client
+
+        self._kimi = planning_client if not nvidia_api_key else None
+        self._deepseek = verification_client if not nvidia_api_key else None
         self._role_map = {
-            self.ROLE_PLANNING: self._kimi,
-            self.ROLE_VERIFICATION: self._deepseek,
-            self.ROLE_FALLBACK: self._deepseek,
+            self.ROLE_PLANNING: planning_client,
+            self.ROLE_VERIFICATION: verification_client,
+            self.ROLE_FALLBACK: fallback_client,
         }
-        logger.info("model_router.initialized")
+        logger.info("model_router.initialized", provider=planning_client.config.provider)
 
-    async def route(self, role: str, messages: List[Dict[str, str]],
+    async def route(self, role: str, messages: List[Any],
                     system_prompt: Optional[str] = None,
                     temperature: Optional[float] = None,
                     max_tokens: Optional[int] = None) -> ModelResponse:
@@ -257,11 +333,17 @@ class ModelRouter:
         try:
             return await client.chat(messages, system_prompt, temperature, max_tokens)
         except Exception as e:
-            if role == self.ROLE_PLANNING:
-                logger.warning("model_router.fallback: %s", e)
-                return await self._deepseek.chat(messages, system_prompt, temperature, max_tokens)
+            if role == self.ROLE_PLANNING and self._nvidia:
+                logger.warning("model_router.fallback_to_nvidia", error=str(e))
+                return await self._nvidia.chat(messages, system_prompt, temperature, max_tokens)
             raise
 
     async def close(self):
-        await self._kimi.close()
-        await self._deepseek.close()
+        if self._nvidia:
+            await self._nvidia.close()
+        if self._kimi:
+            await self._kimi.close()
+        if self._deepseek:
+            await self._deepseek.close()
+
+KimiDeepSeekRouter = ModelRouter

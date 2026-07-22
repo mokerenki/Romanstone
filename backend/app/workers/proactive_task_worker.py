@@ -6,7 +6,7 @@ import uuid
 import os
 import traceback
 from typing import Any, Dict, Optional
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
 
 import redis.asyncio as aioredis
 
@@ -20,7 +20,6 @@ from app.memory.graph_setup import KuzuGraph
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.memory.retriever_tool import MemoryRetrieverTool
-from app.api.tasks import get_redis_client
 from app.agents.router import DomainRouter
 from app.mcp_clients import MCPRegistry
 
@@ -53,8 +52,9 @@ class ProactiveTaskWorker:
         self.cognee_memory = CogneeMemory(config={"kuzu_db_path": kuzu_db_path})
         self.tool_registry.register(MemoryRetrieverTool(self.cognee_memory))
 
-        # Initialize Redis-backed checkpointer for persistence
-        self.checkpointer = RedisCheckpointer(get_redis_client())
+        # Redis client and checkpointer are created in start() once Redis is ready,
+        # because get_redis_client()/aioredis.from_url are async.
+        self.checkpointer: Optional[RedisCheckpointer] = None
 
         # Initialize domain router
         self.mcp_registry = MCPRegistry(self.cognee_memory)
@@ -70,7 +70,10 @@ class ProactiveTaskWorker:
 
         logger.info("proactive_task_worker.starting", consumer_name=self.consumer_name)
         self._running = True
-        self.redis_client = await get_redis_client()
+        self.redis_client = await aioredis.from_url(self.redis_url)
+
+        # Initialize Redis-backed checkpointer now that Redis is ready
+        self.checkpointer = RedisCheckpointer(self.redis_client)
         
         # Initialize Kuzu and Cognee memory for this worker instance
         self.kuzu_graph.initialize()

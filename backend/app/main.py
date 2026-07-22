@@ -6,12 +6,6 @@ from typing import Optional
 
 from app.core import instances
 
-instances.tool_registry = app.state.tool_registry
-instances.mcp_registry = app.state.mcp_registry
-instances.domain_router = app.state.domain_router
-instances.model_router = app.state.model_router
-instances.checkpointer = app.state.checkpointer
-
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
@@ -22,6 +16,8 @@ from app.api.heartbeat_config import router as heartbeat_config_router
 from app.api.tasks import router as tasks_router
 from app.api.websocket_handler import websocket_endpoint
 from app.api.memory_api import router as memory_api_router
+import app.api.memory_api as memory_api
+from app.api.integrations import router as integrations_router
 from app.core.config import settings
 from app.core.redis_checkpointer import RedisCheckpointer
 from app.core.proactive_scheduler import ProactiveScheduler
@@ -61,9 +57,11 @@ async def lifespan(app: FastAPI):
         "qdrant_host": os.getenv("QDRANT_HOST", "qdrant"),
         "qdrant_port": int(os.getenv("QDRANT_PORT", "6333")),
         "kuzu_db_path": os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
+        "embedding_model_name": os.getenv("OPENAI_EMBEDDING_MODEL", "nvidia/nv-embed-v1"),
+        "llm_extraction_model_name": os.getenv("OPENAI_CHAT_MODEL", "meta/llama-3.3-70b-instruct"),
     })
     await app.state.cognee_memory.initialize()
-    memory_api_router.cognee_memory = app.state.cognee_memory
+    memory_api.cognee_memory = app.state.cognee_memory
     logger.info("cognee_memory.initialized")
 
     # Initialize Redis Checkpointer
@@ -109,6 +107,13 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(app.state.proactive_scheduler.start())
     logger.info("proactive_scheduler.started")
 
+    # Populate global instances so cross-module imports can access them
+    instances.tool_registry = app.state.tool_registry
+    instances.mcp_registry = app.state.mcp_registry
+    instances.domain_router = app.state.domain_router
+    instances.model_router = app.state.model_router
+    instances.checkpointer = app.state.checkpointer
+
     yield
 
     # ------------------- CLEANUP -------------------
@@ -152,6 +157,7 @@ app.add_middleware(
 app.include_router(heartbeat_config_router)
 app.include_router(tasks_router)
 app.include_router(memory_api_router)
+app.include_router(integrations_router)
 
 # WebSocket endpoint – now passes tool_registry as well
 @app.websocket("/ws")

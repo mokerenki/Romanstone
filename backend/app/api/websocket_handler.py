@@ -1,12 +1,12 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, AsyncGenerator
+from typing import Any, Dict, AsyncGenerator, Optional
 import traceback
 
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
 
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
@@ -16,8 +16,9 @@ from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.tools.registry import ToolRegistry
 from app.agents.router import DomainRouter
-from app.mcp_clients import MCPRegistry
+from app.mcp_clients.mcp_registry import MCPRegistry
 from app.graph import create_graph
+from app.core import instances
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -28,19 +29,51 @@ async def stream_task_events(
     thread_id: str,
     checkpointer: Any,
     model_router: KimiDeepSeekRouter,
-    browser_service: BrowserAutomationService,
-    tool_registry: ToolRegistry,
-    domain_router: DomainRouter,
+    tool_registry: Optional[ToolRegistry] = None,
+    domain_router: Optional[DomainRouter] = None,
+    browser_service: Optional[BrowserAutomationService] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Stream task execution events via WebSocket.
+
+    Args:
+        user_message: The user's task description.
+        user_id: Identifier of the user.
+        tenant_id: Tenant/organization identifier.
+        thread_id: Conversation thread identifier.
+        checkpointer: LangGraph checkpointer for persistence.
+        model_router: Router for LLM model selection.
+        tool_registry: Registry of available tools (uses global if None).
+        domain_router: Router for domain classification (uses global if None).
+        browser_service: Browser automation service (optional).
+    """
     task_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+
+    # Use global instances if not provided
+    if tool_registry is None:
+        tool_registry = instances.tool_registry
+    if domain_router is None:
+        domain_router = instances.domain_router
+    if checkpointer is None:
+        checkpointer = instances.checkpointer
+    if model_router is None:
+        model_router = instances.model_router
+
+    # Validate required dependencies
+    if tool_registry is None or domain_router is None or checkpointer is None or model_router is None:
+        logger.error("stream_task_events.missing_dependencies")
+        yield {
+            "type": "task_error",
+            "error": "Application dependencies not fully initialized. Please try again later.",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        return
 
     # Create the graph instance for this task
     graph = create_graph(model_router, domain_router, tool_registry, checkpointer)
 
-    # Potential integration point for browser service in the future
     if browser_service:
-        # Example: TODO wire browser_service into the tool registry or task context
         logger.debug("websocket_handler.browser_service_available")
 
     initial_state = {
@@ -50,7 +83,7 @@ async def stream_task_events(
         "tenant_id": tenant_id,
         "messages": [HumanMessage(content=user_message)],
         "plan": [],
-        "current_step": 0, # Ensure this matches what executor.py expects
+        "current_step": 0,
         "results": [],
         "tool_calls": [],
         "verification": None,
@@ -68,22 +101,16 @@ async def stream_task_events(
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "aether"}}
 
-    # Send initial task start event
     yield {"type": "task_start", "task_id": task_id, "message": user_message, "timestamp": now}
 
     try:
-        # Astream the graph execution
         async for event in graph.astream(initial_state, config=config):
-            # LangGraph events come as a dictionary with a single key representing the node name
-            # or '__end__' for the final state.
             event_type = list(event.keys())[0]
             node_output = event[event_type]
 
-            # Customize event types for frontend consumption
             if event_type == "planner":
                 yield {"type": "planner_output", "content": node_output.get("plan"), "timestamp": datetime.now(timezone.utc).isoformat()}
             elif event_type == "executor":
-                # Executor output contains results from steps
                 results = node_output.get("results", [])
                 if results:
                     last_result = results[-1]
@@ -103,7 +130,6 @@ async def stream_task_events(
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             else:
-                # For any other unexpected events, send them as raw graph events
                 logger.debug("unknown_graph_event", event=event)
                 yield {"type": "raw_graph_event", "content": event, "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -123,18 +149,12 @@ async def websocket_endpoint(
     checkpointer: Any,
     model_router: KimiDeepSeekRouter,
     browser_service: BrowserAutomationService,
+    tool_registry: ToolRegistry,
+    domain_router: DomainRouter,
 ):
     await websocket.accept()
     client_id = str(uuid.uuid4())
     logger.info("websocket.connected", client_id=client_id)
-
-    tool_registry = ToolRegistry()
-    tool_registry.register(BrowserTool())
-    tool_registry.register(PythonREPLTool())
-    tool_registry.register(MemoryRetrieverTool(cognee_memory))
-
-    mcp_registry = MCPRegistry(cognee_memory)
-    domain_router = DomainRouter(model_router, mcp_registry)
 
     try:
         while True:
@@ -153,9 +173,9 @@ async def websocket_endpoint(
                     thread_id,
                     checkpointer,
                     model_router,
-                    browser_service,
                     tool_registry,
                     domain_router,
+                    browser_service,
                 ):
                     await websocket.send_json(event)
             elif action == "ping":

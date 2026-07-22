@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage  # type: ignore[import-not-found]
 
 logger = structlog.get_logger("aether.agents.morning_briefing")
 

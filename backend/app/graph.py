@@ -14,10 +14,9 @@ def create_graph(
 ):
     graph = StateGraph(dict)
 
-    # Planner now receives domain_router
-    planner = Planner(router, domain_router, registry)
-    executor = ExecutorNode(registry, router)
     verifier = Verifier(router)
+    planner = Planner(router, domain_router, verifier, registry)
+    executor = ExecutorNode(registry, router)
 
     graph.add_node("planner", planner)
     graph.add_node("executor", executor)

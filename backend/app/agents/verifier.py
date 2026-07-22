@@ -1,7 +1,7 @@
 import structlog
 import json
 from typing import Dict, Any, List, Optional
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage  # type: ignore[import-not-found]
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 
 logger = structlog.get_logger("aether.agents.verifier")
@@ -17,17 +17,87 @@ class Verifier:
         self.model_router = model_router
         logger.info("verifier.initialized")
 
+    async def __call__(self, state: dict) -> dict:
+        """
+        LangGraph node entry point. Called when the graph reaches the "verifier" node.
+        It inspects the state, runs the appropriate verification, and returns an updated state.
+        """
+        logger.info("verifier.called", state_keys=list(state.keys()))
+
+        # Determine what to verify
+        plan = state.get("plan")
+        final_answer = state.get("final_answer")
+        overall_goal = state.get("task", "")
+        context = self._build_context(state)
+
+        # If we have a final answer, verify it
+        if final_answer:
+            verification = await self.verify_final_answer(overall_goal, final_answer, context)
+            state["verification"] = verification
+            # If the final answer passes, mark as done
+            if verification.get("status") == "PASS":
+                state["done"] = True
+                state["status"] = "completed"
+            else:
+                # Otherwise, replan
+                state["needs_replan"] = True
+                state["done"] = False
+            return state
+
+        # If we have a plan but haven't executed it yet, verify the plan
+        if plan and state.get("current_step", 0) == 0:
+            verification = await self.verify_plan(plan, overall_goal)
+            state["verification"] = verification
+            if verification.get("status") != "PASS":
+                state["needs_replan"] = True
+            return state
+
+        # If we're in the middle of execution, verify the last step's output
+        results = state.get("results", [])
+        if results and plan:
+            last_step_index = len(results) - 1
+            if last_step_index < len(plan):
+                step = plan[last_step_index]
+                step_output = results[-1].get("output", "")
+                expected_outcome = step.get("expected_outcome", "No expected outcome provided.")
+                verification = await self.verify_step_output(step, step_output, expected_outcome)
+                state["verification"] = verification
+                if verification.get("status") != "PASS":
+                    state["needs_replan"] = True
+            else:
+                # All steps have been executed? But no final answer yet – maybe the plan is done.
+                # Let's check if we've executed all steps.
+                if state.get("current_step", 0) >= len(plan):
+                    # All steps done, but no final answer? The executor should have produced one.
+                    # For safety, set done to True and let the graph end.
+                    state["done"] = True
+                    state["status"] = "completed"
+                    if not state.get("final_answer"):
+                        state["final_answer"] = "Task completed, but no final answer was generated."
+        else:
+            # No plan or results? Maybe the graph just started; we can skip verification.
+            logger.warning("verifier.no_plan_or_results", state=state)
+
+        return state
+
+    def _build_context(self, state: dict) -> str:
+        """Build a context string from the state for verification prompts."""
+        parts = []
+        if state.get("task"):
+            parts.append(f"Overall Goal: {state['task']}")
+        if state.get("results"):
+            parts.append("Previous Results:")
+            for r in state["results"]:
+                if isinstance(r, dict):
+                    parts.append(f"  - {r.get('step', '')}: {r.get('output', '')}")
+                else:
+                    parts.append(f"  - {r}")
+        return "\n".join(parts)
+
+    # ----- Existing helper methods (unchanged) -----
+
     async def verify_plan(self, plan: List[Dict[str, Any]], overall_goal: str) -> Dict[str, Any]:
-        """
-        Verifies the generated plan against the overall goal.
-        
-        Args:
-            plan: The list of steps in the plan.
-            overall_goal: The high-level objective.
-            
-        Returns:
-            A dictionary with verification status and feedback.
-        """
+        """Verifies the generated plan against the overall goal."""
         system_message = SystemMessage(content=(
             "You are an expert AI Verifier. Your task is to critically evaluate a given plan "
             "against an overall goal. Provide constructive feedback to help the Planner improve."
@@ -36,18 +106,15 @@ class Verifier:
             "and 'feedback' (detailed suggestions for improvement)."
             "If the plan is good, explain why. If it's bad, explain what's missing or wrong."
         ))
-        
         user_message = HumanMessage(content=f"""
         Overall Goal: {overall_goal}
-        
+
         Plan to Verify:
         {json.dumps(plan, indent=2)}
-        
+
         Please provide your verification status, score, and detailed feedback.
         """)
-        
         messages = [system_message, user_message]
-        
         try:
             response = await self.model_router.route("verification", messages, model="kimi")
             feedback = json.loads(response.content)
@@ -58,37 +125,24 @@ class Verifier:
             return {"status": "ERROR", "score": 0, "feedback": f"Failed to verify plan: {str(e)}"}
 
     async def verify_step_output(self, step: Dict[str, Any], step_output: Any, expected_outcome: str) -> Dict[str, Any]:
-        """
-        Verifies the output of a single step against its expected outcome.
-        
-        Args:
-            step: The step definition.
-            step_output: The actual output of the step.
-            expected_outcome: The expected result or impact of the step.
-            
-        Returns:
-            A dictionary with verification status and feedback.
-        """
+        """Verifies the output of a single step against its expected outcome."""
         system_message = SystemMessage(content=(
             "You are an expert AI Verifier. Your task is to evaluate if a step's output "
             "achieved its expected outcome. Provide constructive feedback if it failed."
             "Respond with a JSON object containing 'status' (PASS/FAIL), 'score' (0-100), "
             "and 'feedback' (detailed suggestions for improvement or confirmation of success)."
         ))
-        
         user_message = HumanMessage(content=f"""
         Step: {json.dumps(step, indent=2)}
-        
+
         Expected Outcome: {expected_outcome}
-        
+
         Actual Step Output:
         {str(step_output)}
-        
+
         Did the step achieve its expected outcome? Provide status, score, and feedback.
         """)
-        
         messages = [system_message, user_message]
-        
         try:
             response = await self.model_router.route("verification", messages, model="kimi")
             feedback = json.loads(response.content)
@@ -99,17 +153,7 @@ class Verifier:
             return {"status": "ERROR", "score": 0, "feedback": f"Failed to verify step output: {str(e)}"}
 
     async def verify_final_answer(self, overall_goal: str, final_answer: str, context: str) -> Dict[str, Any]:
-        """
-        Verifies the final answer against the overall goal and provided context.
-        
-        Args:
-            overall_goal: The high-level objective.
-            final_answer: The agent's proposed final answer.
-            context: Relevant context or observations.
-            
-        Returns:
-            A dictionary with verification status and feedback.
-        """
+        """Verifies the final answer against the overall goal and provided context."""
         system_message = SystemMessage(content=(
             "You are an expert AI Verifier. Your task is to critically evaluate a final answer "
             "against the overall goal and provided context. Ensure the answer is complete, "
@@ -117,21 +161,18 @@ class Verifier:
             "Respond with a JSON object containing 'status' (PASS/FAIL), 'score' (0-100), "
             "and 'feedback' (detailed suggestions for improvement or confirmation of success)."
         ))
-        
         user_message = HumanMessage(content=f"""
         Overall Goal: {overall_goal}
-        
+
         Provided Context:
         {context}
-        
+
         Agent's Final Answer:
         {final_answer}
-        
+
         Please provide your verification status, score, and detailed feedback on the final answer.
         """)
-        
         messages = [system_message, user_message]
-        
         try:
             response = await self.model_router.route("verification", messages, model="kimi")
             feedback = json.loads(response.content)

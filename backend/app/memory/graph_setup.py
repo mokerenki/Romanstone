@@ -4,7 +4,7 @@ import structlog
 import os
 import json
 
-from app.memory.domain_schemas import PERSONAL_ASSISTANCE_SCHEMA
+from app.memory.domain_schemas import EXECUTIVE_SCHEMA
 
 logger = structlog.get_logger("aether.memory.graph_setup")
 
@@ -32,7 +32,7 @@ class KuzuGraph:
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             self.db = kuzu.Database(self.db_path)
             self.conn = kuzu.Connection(self.db)
-            self._create_schema(schema or PERSONAL_ASSISTANCE_SCHEMA)
+            self._create_schema(schema or EXECUTIVE_SCHEMA)
             logger.info("kuzu_graph.connected_and_schema_created")
         except Exception as e:
             logger.error("kuzu_graph.initialization_failed", db_path=self.db_path, error=str(e), exc_info=True)
@@ -45,13 +45,13 @@ class KuzuGraph:
             return
 
         # Create Node Tables
-        for entity_def in schema.get("entities", []):
-            entity_type = entity_def.get("label")
-            properties = entity_def.get("properties", [])
+        for entity_name, entity_def in schema.get("entities", {}).items():
+            entity_type = entity_name
+            properties = entity_def.get("properties", {})
             if not entity_type:
                 continue
 
-            properties_str = ", ".join([f"{prop} STRING" for prop in properties])
+            properties_str = ", ".join([f"{prop} {ptype}" for prop, ptype in properties.items()])
             # Add temporal properties to all nodes by default
             properties_str += ", valid_from STRING, valid_to STRING"
             
@@ -66,10 +66,9 @@ class KuzuGraph:
                     logger.warning("kuzu_graph.node_table_creation_failed", table=entity_type, error=str(e), exc_info=True)
 
         # Create Relationship Tables
-        for rel in schema.get("relationships", []):
-            rel_name = rel.get("type")
-            from_type = rel.get("from")
-            to_type = rel.get("to")
+        for rel_name, rel_def in schema.get("relationships", {}).items():
+            from_type = rel_def.get("from")
+            to_type = rel_def.get("to")
             if not rel_name or not from_type or not to_type:
                 continue
 

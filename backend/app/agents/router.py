@@ -1,7 +1,7 @@
 import structlog
 import json
 from typing import Dict, Any, Optional
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage  # type: ignore[import-not-found]
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.mcp_clients import MCPRegistry
 
@@ -13,7 +13,7 @@ class DomainRouter:
     Uses a lightweight LLM (DeepSeek) for classification.
     """
 
-    DOMAINS = ["sales", "marketing", "finance", "executive", "healthcare", "general"]
+    DOMAINS = ["sales", "marketing", "finance", "executive", "healthcare", "product"]
 
     def __init__(self, model_router: KimiDeepSeekRouter, mcp_registry: MCPRegistry):
         self.model_router = model_router
@@ -38,6 +38,7 @@ class DomainRouter:
         - finance: Budgeting, expenses, invoices, financial analysis, modeling
         - executive: Strategic decisions, KPIs, goals, projects, high-level planning
         - healthcare: Claims, insurance, scheduling, patient admin
+        - product: Product management, roadmaps, features, user feedback, product strategy
         - general: Anything else that doesn't fit the above
 
         Respond with ONLY the domain name.

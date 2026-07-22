@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
 from app.tools.registry import ToolRegistry
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 
@@ -21,21 +21,22 @@ class ExecutorNode:
             return new_state
 
         step = plan[current_step]
+        tool_name = step.get("tool_name")
 
-        if step.get("tool_name"):
-            tool = self.registry.get(step["tool_name"])
+        if tool_name and tool_name != "None":  # explicit check
+            tool = self.registry.get(tool_name)
             if tool:
                 result = await tool.execute(**step.get("tool_args", {}))
                 results.append({
                     "step": step.get("description", ""),
-                    "tool": step["tool_name"],
+                    "tool": tool_name,
                     "output": result.get("output", "") if isinstance(result, dict) else str(result)
                 })
             else:
                 results.append({
                     "step": step.get("description", ""),
-                    "tool": step["tool_name"],
-                    "output": f"Tool not found: {step['tool_name']}"
+                    "tool": tool_name,
+                    "output": f"Error: Tool '{tool_name}' not found."
                 })
         else:
             context_parts = []
