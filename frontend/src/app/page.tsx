@@ -14,7 +14,7 @@ interface StreamedEvent {
   task_id?: string;
   message?: string;
   timestamp: string;
-  content?: any; // Can be plan, executor output, verifier output, etc.
+  content?: any;
   status?: string;
   final_answer?: string;
   plan?: PlanStep[];
@@ -39,7 +39,8 @@ export default function Home() {
   useEffect(() => {
     const connectWebSocket = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/api/ws/${clientId}`;
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws/${client_id}`);
+
       ws.onopen = () => {
         console.log("WebSocket connected");
       };
@@ -57,11 +58,11 @@ export default function Home() {
           setCurrentStatus(data.status || "completed");
           setFinalAnswer(data.final_answer || null);
           setCostMetrics(data.cost_metrics || null);
-          setLoading(false); // Task completed, stop loading
+          setLoading(false);
         } else if (data.type === "task_error") {
           setCurrentStatus("failed");
           setFinalAnswer(`Error: ${data.error}\n${data.trace?.join("\n") || ""}`);
-          setLoading(false); // Task failed, stop loading
+          setLoading(false);
         }
       };
 
@@ -74,14 +75,13 @@ export default function Home() {
         if (loading) {
           setCurrentStatus("disconnected");
         }
-        // Attempt to reconnect after a delay
         setTimeout(connectWebSocket, 3000);
       };
 
       ws.onerror = (event) => {
         console.error("WebSocket error event:", event);
         setCurrentStatus("error");
-        setLoading(false); // On error, stop loading
+        setLoading(false);
       };
 
       wsRef.current = ws;
@@ -95,7 +95,6 @@ export default function Home() {
   }, [client_id]);
 
   useEffect(() => {
-    // Scroll to bottom of event log when new events arrive
     if (eventLogRef.current) {
       eventLogRef.current.scrollTop = eventLogRef.current.scrollHeight;
     }
@@ -107,10 +106,10 @@ export default function Home() {
       return;
     }
     setLoading(true);
-    setEvents([]); // Clear previous events
+    setEvents([]);
     setFinalAnswer(null);
     setCostMetrics(null);
-    setCurrentStatus("connecting"); // Set status to connecting while waiting for task_start
+    setCurrentStatus("connecting");
 
     wsRef.current.send(JSON.stringify({
       action: "run_task",

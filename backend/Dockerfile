@@ -6,12 +6,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends     gcc libpq-d
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
-RUN playwright install chromium && playwright install-deps chromium
+RUN playwright install-deps chromium
 
 COPY . .
 RUN mkdir -p /tmp/aether/sandbox
 RUN useradd -m -u 1000 aether && chown -R aether:aether /app /tmp/aether
 USER aether
+ENV PLAYWRIGHT_BROWSERS_PATH=/home/aether/.cache/ms-playwright
+RUN playwright install chromium
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3     CMD curl -f http://localhost:8000/api/health || exit 1

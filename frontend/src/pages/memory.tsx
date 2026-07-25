@@ -1,33 +1,68 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ForceGraph2D } from 'react-force-graph'; // npm install react-force-graph
-import { useQuery } from '@tanstack/react-query'; // npm install @tanstack/react-query
-import DatePicker from 'react-datepicker'; // npm install react-datepicker
+import dynamic from 'next/dynamic';
+import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 
-interface Node { id: string; label: string; color?: string; properties?: any; } // Added properties
-interface Link { source: string; target: string; label?: string; } // Added label
-interface GraphData { nodes: Node[]; links: Link[]; }
+// Dynamically import the 2D graph (client only)
+const ForceGraph2D = dynamic(
+  () => import('react-force-graph-2d'),
+  { ssr: false }
+);
 
-// Schema for form validation
-const memoryQuerySchema = yup.object().shape({
+// QueryClient (created once per page)
+const queryClient = new QueryClient();
+
+// Types
+interface GraphNode {
+  id: string;
+  label: string;
+  color?: string;
+  properties?: any;
+  x?: number;
+  y?: number;
+}
+
+interface GraphLink {
+  source: string;
+  target: string;
+  label?: string;
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+// Yup schema
+const memoryQuerySchema = yup.object({
   mode: yup.string().oneOf(['semantic', 'graph', 'temporal']).required('Query mode is required'),
   query: yup.string().required('Query text is required'),
-  entity_label: yup.string().when('mode', { is: 'temporal', then: yup.string().required('Entity label is required for temporal queries') }),
-  entity_id: yup.string().when('mode', { is: 'temporal', then: yup.string().required('Entity ID is required for temporal queries') }),
-  query_time: yup.date().when('mode', { is: 'temporal', then: yup.date().required('Query time is required for temporal queries') }),
-  top_k: yup.number().integer().min(1).when('mode', { is: 'semantic', then: yup.number().default(5) }),
+  entity_label: yup.string().when('mode', ([mode], schema) =>
+    mode === 'temporal' ? schema.required('Entity label is required for temporal queries') : schema
+  ),
+  entity_id: yup.string().when('mode', ([mode], schema) =>
+    mode === 'temporal' ? schema.required('Entity ID is required for temporal queries') : schema
+  ),
+  query_time: yup.date().when('mode', ([mode], schema) =>
+    mode === 'temporal' ? schema.required('Query time is required for temporal queries') : schema
+  ),
+  top_k: yup.number().integer().min(1).when('mode', ([mode], schema) =>
+    mode === 'semantic' ? schema.default(5) : schema
+  ),
 });
 
-export default function MemoryExplorerPage() {
-  const fgRef = useRef();
+// The actual page content
+function MemoryExplorerContent() {
+  const fgRef = useRef<any>(null);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
-    resolver: yupResolver(memoryQuerySchema),
+  const { control, handleSubmit, watch, formState: { errors } } = useForm({
+    resolver: yupResolver(memoryQuerySchema) as any,
     defaultValues: {
       mode: 'semantic',
       query: '',
@@ -39,18 +74,18 @@ export default function MemoryExplorerPage() {
   });
 
   const queryMode = watch('mode');
+  const [formValues, setFormValues] = useState<any>(null);
 
-  const fetchMemory = useCallback(async (formData: typeof memoryQuerySchema.fields) => {
+  const fetchMemory = useCallback(async (formData: any) => {
     const payload: any = { mode: formData.mode, query: formData.query };
     if (formData.mode === 'semantic') {
-      payload.top_k = formData.top_k;
+      payload.top_k = formData.top_k || 5;
     } else if (formData.mode === 'temporal') {
-      payload.entity_label = formData.entity_label;
-      payload.entity_id = formData.entity_id;
-      payload.query_time = formData.query_time.toISOString();
+      payload.entity_label = formData.entity_label || '';
+      payload.entity_id = formData.entity_id || '';
+      payload.query_time = formData.query_time ? formData.query_time.toISOString() : new Date().toISOString();
     }
-
-    const response = await fetch('/api/agent/tools/memory_retriever', { // Assuming agent exposes tools via API
+    const response = await fetch('/api/agent/tools/memory_retriever', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -62,61 +97,57 @@ export default function MemoryExplorerPage() {
     return response.json();
   }, []);
 
-  const { data, isLoading, isError, error, refetch } = useQuery(
-    ['memoryData', watch()], // Query key changes when form values change
-    () => fetchMemory(watch()),
-    { enabled: false } // Disable automatic fetching, trigger manually
-  );
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['memoryData', formValues],
+    queryFn: () => fetchMemory(formValues!),
+    enabled: false,
+  });
 
   useEffect(() => {
     if (data) {
-      // Process data into graph format
-      const newNodes: Node[] = [];
-      const newLinks: Link[] = [];
+      const newNodes: GraphNode[] = [];
+      const newLinks: GraphLink[] = [];
 
       if (data.mode === 'semantic') {
-        // Semantic search returns documents. Create nodes for them.
-        data.results.forEach((item: any) => {
-          newNodes.push({ id: item.event_id, label: item.content.substring(0, 50) + '...', color: 'blue', properties: item });
+        data.results?.forEach((item: any) => {
+          newNodes.push({
+            id: item.event_id,
+            label: item.content.substring(0, 50) + '...',
+            color: 'blue',
+            properties: item,
+          });
         });
       } else if (data.mode === 'graph') {
-        // Graph query returns nodes and relationships directly
-        // Assuming Kuzu query returns nodes with 'id' and 'label' and relationships with 'source', 'target', 'label'
-        data.results.forEach((item: any) => {
-          // Kuzu query results might be complex, need careful parsing
-          // Example: if query returns nodes directly
+        data.results?.forEach((item: any) => {
           if (item.n && item.n.id) {
             newNodes.push({ id: item.n.id, label: item.n.id, color: 'green', properties: item.n });
           }
-          // Example: if query returns relationships
           if (item.r && item.r.source && item.r.target) {
             newLinks.push({ source: item.r.source, target: item.r.target, label: item.r.type });
           }
         });
       } else if (data.mode === 'temporal') {
-        // Temporal query returns a single fact. Represent as a node or highlight existing.
         if (data.result) {
-          newNodes.push({ id: `${data.entity_id}-${data.query}`, label: `${data.entity_id}: ${data.query} = ${data.result}`, color: 'orange', properties: data });
+          const label = `${data.entity_id}: ${data.query} = ${data.result}`;
+          newNodes.push({
+            id: `${data.entity_id}-${data.query}`,
+            label,
+            color: 'orange',
+            properties: data,
+          });
         }
       }
       setGraphData({ nodes: newNodes, links: newLinks });
     }
   }, [data]);
 
-  const handleNodeClick = useCallback((node: Node) => {
+  const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
-    // Center camera on clicked node
-    // const distance = 40; // Example distance
-    // const distRatio = 1 + distance/Math.hypot(node.x, node.y);
-    // fgRef.current.cameraPosition(
-    //   { x: node.x * distRatio, y: node.y * distRatio, z: fgRef.current.cameraPosition().z }, // new position
-    //   node, // lookAt ({ x, y, z }) 
-    //   3000  // ms transition duration
-    // );
   }, []);
 
   const onSubmit = (formData: any) => {
-    refetch(); // Trigger the query manually
+    setFormValues(formData);
+    refetch();
   };
 
   return (
@@ -201,7 +232,7 @@ export default function MemoryExplorerPage() {
                 render={({ field }) => (
                   <DatePicker
                     selected={field.value}
-                    onChange={(date: Date) => field.onChange(date)}
+                    onChange={(date: Date | null) => field.onChange(date)}
                     showTimeSelect
                     dateFormat="Pp"
                     className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -257,41 +288,44 @@ export default function MemoryExplorerPage() {
           onNodeClick={handleNodeClick}
           nodeCanvasObject={(node, ctx, globalScale) => {
             const label = node.label;
-            const fontSize = 12/globalScale;
+            const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Sans-Serif`;
             const textWidth = ctx.measureText(label).width;
-            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
+            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
+
+            const x = node.x ?? 0;
+            const y = node.y ?? 0;
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+            ctx.fillRect(x - bckgDimensions[0] / 2, y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = node.color || 'white';
-            ctx.fillText(label, node.x, node.y);
+            ctx.fillText(label, x, y);
 
-            node.__bckgDimensions = bckgDimensions; // to re-use in nodePointerAreaPaint
+            (node as any).__bckgDimensions = bckgDimensions;
           }}
           nodePointerAreaPaint={(node, color, ctx) => {
             ctx.fillStyle = color;
-            const bckgDimensions = node.__bckgDimensions;
-            bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+            const bckgDimensions = (node as any).__bckgDimensions;
+            if (bckgDimensions) {
+              const x = node.x ?? 0;
+              const y = node.y ?? 0;
+              ctx.fillRect(x - bckgDimensions[0] / 2, y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
+            }
           }}
           linkCanvasObject={(link, ctx, globalScale) => {
             const label = link.label;
             if (!label) return;
 
-            const start = link.source;
-            const end = link.target;
+            const startNode = typeof link.source === 'object' ? link.source : graphData.nodes.find(n => n.id === link.source);
+            const endNode = typeof link.target === 'object' ? link.target : graphData.nodes.find(n => n.id === link.target);
+            if (!startNode || !endNode) return;
 
-            // ignore if link not yet rendered
-            if (typeof start !== 'object' || typeof end !== 'object') return;
+            const midx = (startNode.x! + endNode.x!) / 2;
+            const midy = (startNode.y! + endNode.y!) / 2;
 
-            // calculate mid-point of the link
-            const midx = (start.x + end.x) / 2;
-            const midy = (start.y + end.y) / 2;
-
-            // Draw text
-            const fontSize = 8/globalScale;
+            const fontSize = 8 / globalScale;
             ctx.font = `${fontSize}px Sans-Serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -324,3 +358,6 @@ export default function MemoryExplorerPage() {
     </div>
   );
 }
+
+// Export the page with SSR disabled to avoid QueryClient provider issues
+export default dynamic(() => Promise.resolve(MemoryExplorerContent), { ssr: false });
