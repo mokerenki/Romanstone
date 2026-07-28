@@ -16,7 +16,7 @@ const ForceGraph2D = dynamic(
 // QueryClient (created once per page)
 const queryClient = new QueryClient();
 
-// Types
+// Types for our internal graph data
 interface GraphNode {
   id: string;
   label: string;
@@ -141,8 +141,11 @@ function MemoryExplorerContent() {
     }
   }, [data]);
 
-  const handleNodeClick = useCallback((node: GraphNode) => {
-    setSelectedNode(node);
+  // Use 'any' for node to bypass strict type checking from the library
+  const handleNodeClick = useCallback((node: any) => {
+    if (node) {
+      setSelectedNode(node);
+    }
   }, []);
 
   const onSubmit = (formData: any) => {
@@ -286,8 +289,8 @@ function MemoryExplorerContent() {
           linkDirectionalArrowRelPos={1}
           linkCurvature={0.25}
           onNodeClick={handleNodeClick}
-          nodeCanvasObject={(node, ctx, globalScale) => {
-            const label = node.label;
+          nodeCanvasObject={(node: any, ctx: any, globalScale: number) => {
+            const label = node.label || node.id;
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Sans-Serif`;
             const textWidth = ctx.measureText(label).width;
@@ -303,18 +306,18 @@ function MemoryExplorerContent() {
             ctx.fillStyle = node.color || 'white';
             ctx.fillText(label, x, y);
 
-            (node as any).__bckgDimensions = bckgDimensions;
+            node.__bckgDimensions = bckgDimensions;
           }}
-          nodePointerAreaPaint={(node, color, ctx) => {
+          nodePointerAreaPaint={(node: any, color: string, ctx: any) => {
             ctx.fillStyle = color;
-            const bckgDimensions = (node as any).__bckgDimensions;
+            const bckgDimensions = node.__bckgDimensions;
             if (bckgDimensions) {
               const x = node.x ?? 0;
               const y = node.y ?? 0;
               ctx.fillRect(x - bckgDimensions[0] / 2, y - bckgDimensions[1] / 2, bckgDimensions[0], bckgDimensions[1]);
             }
           }}
-          linkCanvasObject={(link, ctx, globalScale) => {
+          linkCanvasObject={(link: any, ctx: any, globalScale: number) => {
             const label = link.label;
             if (!label) return;
 
@@ -336,7 +339,7 @@ function MemoryExplorerContent() {
 
         {selectedNode && (
           <div className="absolute top-4 right-4 bg-gray-900 p-4 rounded-lg shadow-lg max-w-sm z-10 border border-gray-700">
-            <h3 className="text-lg font-bold text-white mb-2">Node Details: {selectedNode.label}</h3>
+            <h3 className="text-lg font-bold text-white mb-2">Node Details: {selectedNode.label || selectedNode.id}</h3>
             <p className="text-gray-300 text-sm mb-1">ID: {selectedNode.id}</p>
             {selectedNode.properties && (
               <div className="text-gray-300 text-sm">
@@ -359,5 +362,5 @@ function MemoryExplorerContent() {
   );
 }
 
-// Export the page with SSR disabled to avoid QueryClient provider issues
+// Export the page with SSR disabled
 export default dynamic(() => Promise.resolve(MemoryExplorerContent), { ssr: false });
