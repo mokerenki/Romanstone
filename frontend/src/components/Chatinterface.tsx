@@ -45,7 +45,6 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
   
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const client_id = useRef(Math.random().toString(36).substring(7)).current;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,8 +57,7 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
   // WebSocket connection with authentication
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/${client_id}`;
-    // If token provided, pass as query param or in header (browser WebSocket doesn't support headers, so use query)
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     const url = token ? `${wsUrl}?token=${token}` : wsUrl;
     const ws = new WebSocket(url);
 
@@ -82,7 +80,7 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
       console.log("WebSocket disconnected");
       setIsConnected(false);
       setTimeout(() => {
-        const newWs = new WebSocket(url);
+        const newWs = new WebSocket(wsUrl);
         wsRef.current = newWs;
       }, 3000);
     };
@@ -95,9 +93,9 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
     wsRef.current = ws;
 
     return () => {
-      ws.close();
+      wsRef.current?.close();
     };
-  }, [client_id, token]);
+  }, [wsUrl]);
 
   const handleWebSocketMessage = (data: any) => {
     const timestamp = new Date(data.timestamp || Date.now());

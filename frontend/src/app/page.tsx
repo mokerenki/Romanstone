@@ -34,12 +34,10 @@ export default function Home() {
   const wsRef = useRef<WebSocket | null>(null);
   const eventLogRef = useRef<HTMLDivElement>(null);
 
-  const client_id = useRef(Math.random().toString(36).substring(7)).current;
-
   useEffect(() => {
     const connectWebSocket = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const ws = new WebSocket(`${protocol}//${window.location.hostname}:8000/ws/${client_id}`);
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
       ws.onopen = () => {
         console.log("WebSocket connected");
@@ -62,6 +60,10 @@ export default function Home() {
         } else if (data.type === "task_error") {
           setCurrentStatus("failed");
           setFinalAnswer(`Error: ${data.error}\n${data.trace?.join("\n") || ""}`);
+          setLoading(false);
+        } else if (data.type === "error") {
+          setCurrentStatus("failed");
+          setFinalAnswer(`Error: ${data.message || "Unknown error"}`);
           setLoading(false);
         }
       };
@@ -92,7 +94,7 @@ export default function Home() {
     return () => {
       wsRef.current?.close();
     };
-  }, [client_id]);
+  }, []);
 
   useEffect(() => {
     if (eventLogRef.current) {
@@ -163,11 +165,11 @@ export default function Home() {
 
           <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 max-h-96 overflow-y-auto" ref={eventLogRef}>
             <h3 className="text-lg font-semibold mb-2 text-white">Event Log</h3>
-            {events.map((event, index) => (
-              <div key={index} className="text-gray-200 text-sm mb-1">
-                <span className="text-gray-500">[{new Date(event.timestamp).toLocaleTimeString()}]</span>
-                <span className="font-semibold ml-2">{event.type}:</span>
-                {event.type === "planner_output" && (
+              {events.map((event, index) => (
+                <div key={index} className="text-gray-200 text-sm mb-1">
+                  <span className="text-gray-500">[{new Date(event.timestamp || Date.now()).toLocaleTimeString()}]</span>
+                  <span className="font-semibold ml-2">{event.type}:</span>
+                  {event.type === "planner_output" && (
                   <pre className="whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
                     {JSON.stringify(event.content, null, 2)}
                   </pre>
@@ -185,6 +187,11 @@ export default function Home() {
                 {event.type === "task_error" && (
                   <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
                     {event.error}\n{event.trace?.join("\n")}
+                  </pre>
+                )}
+                {event.type === "error" && (
+                  <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
+                    {event.message || event.error || "Unknown error"}
                   </pre>
                 )}
                 {(event.type === "task_start" || event.type === "task_complete") && (
