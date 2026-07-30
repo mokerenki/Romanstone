@@ -48,15 +48,9 @@ services:
 
   mcp-filesystem:
     image: mcp/filesystem:latest
+    command: ["mcp-server-filesystem", "/workspace"]
     volumes:
       - ./backend:/workspace
-    networks:
-      - aether_network
-
-  mcp-github:
-    image: mcp/github:latest
-    environment:
-      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN}
     networks:
       - aether_network
 
@@ -98,12 +92,6 @@ services:
         {
           "filesystem": {
             "url": "http://mcp-filesystem:3000/sse"
-          },
-          "github": {
-            "url": "http://mcp-github:3000/sse",
-            "headers": {
-              "Authorization": "Bearer ${GITHUB_TOKEN}"
-            }
           }
         }
     depends_on:

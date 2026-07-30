@@ -28,7 +28,6 @@ class KuzuGraph:
 
         logger.info("kuzu_graph.connecting", db_path=self.db_path)
         try:
-            # Ensure the directory exists
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
             self.db = kuzu.Database(self.db_path)
             self.conn = kuzu.Connection(self.db)
@@ -51,16 +50,24 @@ class KuzuGraph:
             if not entity_type:
                 continue
 
-            properties_str = ", ".join([f"{prop} {ptype}" for prop, ptype in properties.items()])
-            # Add temporal properties to all nodes by default
-            properties_str += ", valid_from STRING, valid_to STRING"
-            
-            create_node_query = f"CREATE NODE TABLE {entity_type}(id STRING, {properties_str}, PRIMARY KEY (id))"
+            # Exclude 'id' from properties because it's added as PRIMARY KEY separately
+            props_without_id = {k: v for k, v in properties.items() if k != "id"}
+            properties_str = ", ".join([f"{prop} {ptype}" for prop, ptype in props_without_id.items()])
+            # Add temporal properties if not present
+            if "valid_from" not in props_without_id:
+                properties_str += (", " if properties_str else "") + "valid_from STRING, valid_to STRING"
+            # If they are present, they're already included
+
+            if properties_str:
+                create_node_query = f"CREATE NODE TABLE {entity_type}(id STRING, {properties_str}, PRIMARY KEY (id))"
+            else:
+                create_node_query = f"CREATE NODE TABLE {entity_type}(id STRING, PRIMARY KEY (id))"
+
             try:
                 self.conn.execute(create_node_query)
                 logger.info("kuzu_graph.node_table_created", table=entity_type)
-            except kuzu.KuzuException as e:
-                if "Node table with name" in str(e) and "already exists" in str(e):
+            except Exception as e:
+                if "already exists" in str(e).lower():
                     logger.info("kuzu_graph.node_table_exists", table=entity_type)
                 else:
                     logger.warning("kuzu_graph.node_table_creation_failed", table=entity_type, error=str(e), exc_info=True)
@@ -72,27 +79,28 @@ class KuzuGraph:
             if not rel_name or not from_type or not to_type:
                 continue
 
-            rel_properties_str = ", valid_from STRING, valid_to STRING"
-            create_rel_query = f"CREATE REL TABLE {rel_name}(FROM {from_type} TO {to_type} PROPERTIES ({rel_properties_str}))"
+            # Add temporal properties to relationships by default
+            rel_properties_str = "valid_from STRING, valid_to STRING"
+            create_rel_query = f"CREATE REL TABLE {rel_name}(FROM {from_type} TO {to_type}), PROPERTIES ({rel_properties_str})"
             try:
                 self.conn.execute(create_rel_query)
                 logger.info("kuzu_graph.rel_table_created", table=rel_name, from_node=from_type, to_node=to_type)
-            except kuzu.KuzuException as e:
-                if "Rel table with name" in str(e) and "already exists" in str(e):
+            except Exception as e:
+                if "already exists" in str(e).lower():
                     logger.info("kuzu_graph.rel_table_exists", table=rel_name)
                 else:
                     logger.warning("kuzu_graph.rel_table_creation_failed", table=rel_name, error=str(e), exc_info=True)
 
     def add_node(self, label: str, properties: Dict[str, Any]):
         """Adds or updates a node in the graph. Uses MERGE for idempotency."""
-        if not self.conn: self.initialize()
+        if not self.conn:
+            self.initialize()
         
         node_id = properties.get("id")
         if not node_id:
             logger.error("kuzu_graph.add_node_missing_id", label=label, properties=properties)
             return
 
-        # Build safe Cypher SET clause
         props_for_query = {k: v for k, v in properties.items() if k != "id"}
         set_parts = [f"n.id = '{_escape_cypher_string(str(node_id))}'"]
         for k, v in props_for_query.items():
@@ -109,8 +117,9 @@ class KuzuGraph:
             logger.error("kuzu_graph.node_merge_failed", label=label, id=node_id, error=str(e), exc_info=True)
 
     def add_edge(self, from_label: str, from_id: str, to_label: str, to_id: str, rel_type: str, properties: Dict[str, Any] = None):
-        """Adds or updates an edge between two nodes. Uses MERGE for idempotency."""
-        if not self.conn: self.initialize()
+        """Adds or updates an edge between two nodes."""
+        if not self.conn:
+            self.initialize()
         
         rel_properties = properties or {}
         set_parts = []
@@ -130,8 +139,9 @@ class KuzuGraph:
             logger.error("kuzu_graph.edge_merge_failed", from_id=from_id, to_id=to_id, rel_type=rel_type, error=str(e), exc_info=True)
 
     def query(self, cypher_query: str) -> List[Dict[str, Any]]:
-        """Executes a Cypher query and returns results as a list of dictionaries."""
-        if not self.conn: self.initialize()
+        """Executes a Cypher query and returns results."""
+        if not self.conn:
+            self.initialize()
         try:
             response = self.conn.execute(cypher_query)
             results = []

@@ -40,7 +40,8 @@ class MCPClient:
         logger.info("mcp_client.connecting", name=self.name, url=self.url)
         headers = await self._get_headers()
         self._sse = sse_client(self.url, headers=headers, timeout=self.timeout)
-        self._session = ClientSession(self._sse)
+        read_stream, write_stream = await self._sse.__aenter__()
+        self._session = ClientSession(read_stream, write_stream)
         await self._session.initialize()
         logger.info("mcp_client.connected", name=self.name)
 
@@ -64,5 +65,5 @@ class MCPClient:
         if self._session:
             await self._session.close()
         if self._sse:
-            await self._sse.close()
+            await self._sse.__aexit__(None, None, None)
         logger.info("mcp_client.closed", name=self.name)
