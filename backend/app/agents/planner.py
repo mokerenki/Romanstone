@@ -41,6 +41,11 @@ class Planner:
         if state.get("needs_replan", False):
             feedback = state.get("verification", {})
             plan = await self.replan(overall_goal, context, feedback, image_data)
+            if self.replan_count >= self.max_replans:
+                state["done"] = True
+                state["status"] = "completed"
+                if not state.get("final_answer"):
+                    state["final_answer"] = "Task completed with current plan after maximum replanning iterations."
         else:
             plan = await self.generate_plan(overall_goal, context, image_data, user_id, thread_id)
 

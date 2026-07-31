@@ -224,4 +224,4 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         logger.info("websocket.disconnected", client_id=client_id)
     except Exception as e:
         logger.exception("websocket_error", client_id=client_id, error=str(e))
-        await websocket.send_json({"type": "error", "message": str(e)})
+        await websocket.send_json({"type": "error", "message": str(e), "timestamp": datetime.now(timezone.utc).isoformat()})
