@@ -69,6 +69,21 @@ class BaseModelClient(ABC):
                    temperature: Optional[float] = None, max_tokens: Optional[int] = None) -> ModelResponse:
         pass
 
+    def _normalize_message(self, msg: Any) -> Dict[str, str]:
+        if isinstance(msg, dict):
+            role = msg.get("role", msg.get("type", "user"))
+            content = msg.get("content", "")
+        else:
+            role = getattr(msg, "type", None) or getattr(msg, "role", None) or "user"
+            content = getattr(msg, "content", "")
+
+        if role == "human":
+            role = "user"
+        elif role == "ai":
+            role = "assistant"
+
+        return {"role": str(role), "content": str(content)}
+        
     def _parse_usage(self, raw: Dict[str, Any]) -> TokenUsage:
         usage = raw.get("usage", {})
         return TokenUsage(
@@ -90,10 +105,7 @@ class KimiK2Client(BaseModelClient):
         if system_prompt:
             payload_messages.append({"role": "system", "content": str(system_prompt)})
         for msg in messages:
-            payload_messages.append({
-                "role": str(msg.get("role", "user")),
-                "content": str(msg.get("content", ""))
-            })
+            payload_messages.append(self._normalize_message(msg))
 
         # Build payload with correct parameter names and types
         payload = {
@@ -179,7 +191,7 @@ class DeepSeekClient(BaseModelClient):
     #@track(project_name="aether", name="deepseek_chat")
     async def chat(self, messages, system_prompt=None, temperature=None, max_tokens=None):
         start = time.perf_counter()
-        payload_messages = list(messages)
+        payload_messages = [self._normalize_message(m) for m in messages]
         if system_prompt:
             payload_messages.insert(0, {"role": "system", "content": system_prompt})
 
@@ -220,11 +232,7 @@ class NvidiaClient(BaseModelClient):
         if system_prompt:
             payload_messages.append({"role": "system", "content": str(system_prompt)})
         for msg in messages:
-            payload_messages.append({
-                "role": str(msg.get("role", "user")),
-                "content": str(msg.get("content", ""))
-            })
-
+            payload_messages.append(self._normalize_message(msg))
         payload = {
             "model": str(self.config.model),
             "messages": payload_messages,

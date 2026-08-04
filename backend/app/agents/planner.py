@@ -6,6 +6,7 @@ from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.agents.router import DomainRouter
 from app.tools.registry import ToolRegistry
 from app.agents.verifier import Verifier
+from app.core.llm_json import parse_llm_json
 
 logger = structlog.get_logger("aether.agents.planner")
 
@@ -39,16 +40,23 @@ class Planner:
 
         # Check if we need to replan
         if state.get("needs_replan", False):
-            feedback = state.get("verification", {})
+            feedback = (
+                state.get("replan_feedback")
+                or state.get("feedback")
+                or state.get("verification")
+                or {}
+            )
             plan = await self.replan(overall_goal, context, feedback, image_data)
             if self.replan_count >= self.max_replans:
                 state["done"] = True
                 state["status"] = "completed"
                 if not state.get("final_answer"):
-                    state["final_answer"] = "Task completed with current plan after maximum replanning iterations."
+                    state["final_answer"] = (
+                        "Task completed with current plan after maximum replanning iterations."
+                    )
         else:
+            self.replan_count = 0
             plan = await self.generate_plan(overall_goal, context, image_data, user_id, thread_id)
-
         # Update state
         state["plan"] = plan
         state["current_step"] = 0
@@ -81,8 +89,8 @@ class Planner:
         domain_context = route_result["context"]
         system_prompt = route_result["system_prompt"]
 
-        available_tools = self.tool_registry.list_tools()
-        tools_description = ", ".join([f"'{t}'" for t in available_tools])
+        tool_schemas = self.tool_registry.describe_all()
+        tools_description = json.dumps(tool_schemas, indent=2)
 
         system_message = SystemMessage(content=(
             system_prompt + "\n\n" +
@@ -91,7 +99,8 @@ class Planner:
             "Each step should be a JSON object with 'step_id', 'description', 'tool_name', "
             "and 'tool_args' (a dictionary). If no tool is needed, set 'tool_name' to null. "
             "Respond with a JSON array of step objects. "
-            f"Available tools: {tools_description}"
+            f"Available tools (with their exact required parameters — use these exact "
+            f"argument names in tool_args, do not invent your own): {tools_description}"
         ))
 
         user_message = HumanMessage(content=f"""
@@ -108,8 +117,8 @@ class Planner:
         messages = [system_message, user_message]
 
         try:
-            response = await self.model_router.route("planning", messages, model="kimi", image_data=image_data)
-            plan = json.loads(response.content)
+            response = await self.model_router.route("planning", messages)
+            plan = parse_llm_json(response.content)
             self.current_plan = plan
             logger.info("planner.initial_plan_generated", num_steps=len(plan), domain=domain)
             return plan
@@ -132,7 +141,9 @@ class Planner:
             "and 'tool_args' (a dictionary). If no tool is needed, set 'tool_name' to null. "
             "Consider the provided context, visual information, and especially the feedback."
             "Respond with a JSON array of revised step objects."
-            f"Available tools: {', '.join(self.tool_registry.list_tools())}"
+            f"Available tools (with their exact required parameters — use these exact "
+            f"argument names in tool_args, do not invent your own): "
+            f"{json.dumps(self.tool_registry.describe_all(), indent=2)}"
         ))
 
         user_message = HumanMessage(content=f"""
@@ -152,8 +163,8 @@ class Planner:
         messages = [system_message, user_message]
 
         try:
-            response = await self.model_router.route("planning", messages, model="kimi", image_data=image_data)
-            revised_plan = json.loads(response.content)
+            response = await self.model_router.route("planning", messages)
+            revised_plan = parse_llm_json(response.content)
             self.current_plan = revised_plan
             logger.info("planner.revised_plan_generated", num_steps=len(revised_plan), replan_count=self.replan_count)
             return revised_plan

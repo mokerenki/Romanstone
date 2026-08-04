@@ -54,8 +54,12 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // WebSocket connection with authentication
-  useEffect(() => {
+// WebSocket connection with authentication
+useEffect(() => {
+  let reconnectTimeout: ReturnType<typeof setTimeout>;
+  let isUnmounted = false;
+
+  const connect = () => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     const url = token ? `${wsUrl}?token=${token}` : wsUrl;
@@ -69,7 +73,6 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'auth_error') {
-        // Handle authentication error
         alert('Authentication failed. Please log in again.');
         return;
       }
@@ -79,10 +82,9 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
     ws.onclose = () => {
       console.log("WebSocket disconnected");
       setIsConnected(false);
-      setTimeout(() => {
-        const newWs = new WebSocket(wsUrl);
-        wsRef.current = newWs;
-      }, 3000);
+      if (!isUnmounted) {
+        reconnectTimeout = setTimeout(connect, 3000);
+      }
     };
 
     ws.onerror = (error) => {
@@ -91,11 +93,16 @@ export default function ChatInterface({ userId = "dashboard", tenantId = "defaul
     };
 
     wsRef.current = ws;
+  };
 
-    return () => {
-      wsRef.current?.close();
-    };
-  }, [wsUrl]);
+  connect();
+
+  return () => {
+    isUnmounted = true;
+    clearTimeout(reconnectTimeout);
+    wsRef.current?.close();
+  };
+}, [token]);
 
   const handleWebSocketMessage = (data: any) => {
     const timestamp = new Date(data.timestamp || Date.now());

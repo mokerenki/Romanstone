@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any, List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage  # type: ignore[import-not-found]
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
+from app.core.llm_json import parse_llm_json
 
 logger = structlog.get_logger("aether.agents.verifier")
 
@@ -116,8 +117,8 @@ class Verifier:
         """)
         messages = [system_message, user_message]
         try:
-            response = await self.model_router.route("verification", messages, model="kimi")
-            feedback = json.loads(response.content)
+            response = await self.model_router.route("verification", messages)
+            feedback = parse_llm_json(response.content)
             logger.info("verifier.plan_verified", status=feedback.get("status"), score=feedback.get("score"))
             return feedback
         except Exception as e:
@@ -144,8 +145,8 @@ class Verifier:
         """)
         messages = [system_message, user_message]
         try:
-            response = await self.model_router.route("verification", messages, model="kimi")
-            feedback = json.loads(response.content)
+            response = await self.model_router.route("verification", messages)
+            feedback = parse_llm_json(response.content)
             logger.info("verifier.step_output_verified", status=feedback.get("status"), score=feedback.get("score"))
             return feedback
         except Exception as e:
@@ -174,8 +175,8 @@ class Verifier:
         """)
         messages = [system_message, user_message]
         try:
-            response = await self.model_router.route("verification", messages, model="kimi")
-            feedback = json.loads(response.content)
+            response = await self.model_router.route("verification", messages)
+            feedback = parse_llm_json(response.content)
             logger.info("verifier.final_answer_verified", status=feedback.get("status"), score=feedback.get("score"))
             return feedback
         except Exception as e:

@@ -19,6 +19,7 @@ from app.agents.router import DomainRouter
 from app.mcp_clients.mcp_registry import MCPRegistry
 from app.graph import create_graph
 from app.core import instances
+from app.core.errors import TaskErrorCode, to_user_error
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -99,7 +100,7 @@ async def stream_task_events(
         "scratchpad": "",
     }
 
-    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "aether"}}
+    config = {"configurable": {"thread_id": thread_id}}
 
     yield {"type": "task_start", "task_id": task_id, "message": user_message, "timestamp": now}
 
@@ -116,29 +117,38 @@ async def stream_task_events(
                     last_result = results[-1]
                     yield {"type": "executor_output", "content": last_result, "timestamp": datetime.now(timezone.utc).isoformat()}
             elif event_type == "verifier":
-                yield {"type": "verifier_output", "content": node_output, "timestamp": datetime.now(timezone.utc).isoformat()}
-            elif event_type == "__end__":
-                final_state = node_output
-                yield {
-                    "type": "task_complete",
-                    "task_id": final_state["task_id"],
-                    "status": final_state["status"],
-                    "final_answer": final_state.get("final_answer"),
-                    "plan": final_state.get("plan"),
-                    "verification": final_state.get("verification"),
-                    "cost_metrics": final_state.get("cost_metrics"),
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
+                yield {"type": "verifier_output", "content": node_output.get("verification"), "timestamp": datetime.now(timezone.utc).isoformat()}
             else:
-                logger.debug("unknown_graph_event", event=event)
-                yield {"type": "raw_graph_event", "content": event, "timestamp": datetime.now(timezone.utc).isoformat()}
+                logger.debug("unknown_graph_event", event_type=event_type)
+
+        # NOTE: deliberately not special-casing "__end__" above -- LangGraph's
+        # astream() does not reliably emit a distinct end event; it simply
+        # stops iterating once the graph reaches END. task_complete is always
+        # sent explicitly here, after the loop, using the authoritative final
+        # state from the checkpointer -- this guarantees the frontend always
+        # gets exactly one definitive completion signal, regardless of how
+        # the graph internally terminated.
+        snapshot = await graph.aget_state(config)
+        final_state = snapshot.values if snapshot and snapshot.values else initial_state
+
+        yield {
+            "type": "task_complete",
+            "task_id": final_state.get("task_id", task_id),
+            "status": final_state.get("status", "completed"),
+            "final_answer": final_state.get("final_answer"),
+            "plan": final_state.get("plan"),
+            "verification": final_state.get("verification"),
+            "cost_metrics": final_state.get("cost_metrics"),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
     except Exception as exc:
-        logger.exception("websocket_task_execution_failed", error=str(exc))
+        code, user_message = to_user_error(exc)
+        logger.exception("websocket_task_execution_failed", error_code=code, error=str(exc))
         yield {
             "type": "task_error",
-            "error": str(exc),
-            "trace": traceback.format_exc().splitlines()[-5:],
+            "error_code": code,
+            "message": user_message,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
@@ -183,5 +193,11 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         logger.info("websocket.disconnected", client_id=client_id)
     except Exception as exc:
-        logger.exception("websocket.error", client_id=client_id, error=str(exc))
-        await websocket.send_json({"type": "error", "message": str(exc), "timestamp": datetime.now(timezone.utc).isoformat()})
+        code, user_message = to_user_error(exc)
+        logger.exception("websocket.error", client_id=client_id, error_code=code, error=str(exc))
+        await websocket.send_json({
+            "type": "error",
+            "error_code": code,
+            "message": user_message,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })

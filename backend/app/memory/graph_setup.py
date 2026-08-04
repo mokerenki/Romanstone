@@ -81,7 +81,7 @@ class KuzuGraph:
 
             # Add temporal properties to relationships by default
             rel_properties_str = "valid_from STRING, valid_to STRING"
-            create_rel_query = f"CREATE REL TABLE {rel_name}(FROM {from_type} TO {to_type}), PROPERTIES ({rel_properties_str})"
+            create_rel_query = f"CREATE REL TABLE {rel_name}(FROM {from_type} TO {to_type}, {rel_properties_str})"
             try:
                 self.conn.execute(create_rel_query)
                 logger.info("kuzu_graph.rel_table_created", table=rel_name, from_node=from_type, to_node=to_type)

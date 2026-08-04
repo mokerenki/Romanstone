@@ -19,7 +19,6 @@ from app.api.memory_api import router as memory_api_router
 import app.api.memory_api as memory_api
 from app.api.integrations import router as integrations_router
 from app.core.config import settings
-from app.core.redis_checkpointer import RedisCheckpointer
 from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
@@ -65,7 +64,11 @@ async def lifespan(app: FastAPI):
     logger.info("cognee_memory.initialized")
 
     # Initialize Redis Checkpointer
-    app.state.checkpointer = RedisCheckpointer(app.state.redis_client)
+    # Initialize Checkpointer
+    # TEMP: using LangGraph's built-in InMemorySaver until RedisCheckpointer
+    # properly implements the BaseCheckpointSaver interface (see backend/app/core/redis_checkpointer.py)
+    from langgraph.checkpoint.memory import InMemorySaver
+    app.state.checkpointer = InMemorySaver()
     tasks_router.checkpointer = app.state.checkpointer
     logger.info("checkpointer.initialized")
 

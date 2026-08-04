@@ -47,9 +47,8 @@ class DomainRouter:
         try:
             # Use DeepSeek for classification (fast and cheap)
             response = await self.model_router.route(
-                "classification",
-                [classification_prompt, HumanMessage(content=user_message)],
-                model="deepseek"
+                "fallback",
+                [classification_prompt, HumanMessage(content=user_message)]
             )
 
             domain = response.content.strip().lower()
