@@ -51,10 +51,11 @@ class MemoryConfig:
 class SandboxConfig:
     """Phase 2: Firecracker / Kubernetes"""
     enabled: bool = False
-    runtime: str = "docker"  # docker | firecracker | k8s
+    runtime: str = "docker"  # docker | firecracker | k8s | e2b
     sandbox_root: str = "/tmp/aether/sandbox"
     k8s_namespace: str = "aether-sandboxes"
     max_concurrent: int = 10
+    e2b_api_key: str = os.getenv("E2B_API_KEY", "").strip()
 
 
 @dataclass(frozen=True)

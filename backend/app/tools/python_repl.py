@@ -1,7 +1,16 @@
-"""PythonREPLTool — Phase 0 stub."""
+"""PythonREPLTool backed by an E2B sandbox manager."""
+
+from typing import Optional
+
+from app.sandbox.manager import SandboxManager, get_active_sandbox_manager, get_active_task_id
 from app.tools.registry import BaseTool, ToolSchema
 
+
 class PythonREPLTool(BaseTool):
+    def __init__(self, sandbox_manager: Optional[SandboxManager] = None):
+        self.sandbox_manager = sandbox_manager
+        super().__init__()
+
     def _build_schema(self) -> ToolSchema:
         return ToolSchema(
             name="python_repl",
@@ -15,15 +24,15 @@ class PythonREPLTool(BaseTool):
 
     async def execute(self, **kwargs):
         code = kwargs.get("code", "")
-        # Phase 0: limited local execution. Phase 2: sandbox.
-        import io, sys, traceback
-        old = sys.stdout
-        sys.stdout = io.StringIO()
+        task_id = kwargs.get("task_id") or kwargs.get("thread_id") or get_active_task_id() or "default"
+        sandbox_manager = self.sandbox_manager or get_active_sandbox_manager()
+
+        if not sandbox_manager:
+            return {"output": "Sandbox manager is not configured."}
+
         try:
-            exec(code)
-            output = sys.stdout.getvalue()
-        except Exception:
-            output = traceback.format_exc()
-        finally:
-            sys.stdout = old
-        return {"output": output}
+            await sandbox_manager.create(task_id)
+            result = await sandbox_manager.execute(task_id, code)
+            return {"output": result.get("output", "")}
+        except Exception as exc:
+            return {"output": f"Sandbox execution failed: {exc}"}

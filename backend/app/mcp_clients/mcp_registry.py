@@ -1,7 +1,7 @@
 import os
 import json
 import yaml
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from app.mcp_clients.base_mcp_client import MCPClient
 from app.mcp_clients.mcp_tool_wrapper import MCPToolWrapper
 from app.tools.registry import ToolRegistry
@@ -49,6 +49,22 @@ class MCPRegistry:
                 timeout=cfg.get("timeout", 30.0),
                 sse_read_timeout=cfg.get("sse_read_timeout", 300.0),
             )
+
+    DOMAIN_PROMPTS: Dict[str, str] = {
+        "sales": "You are a sales assistant.",
+        "marketing": "You are a marketing assistant.",
+        "finance": "You are a finance assistant.",
+        "executive": "You are an executive assistant.",
+        "healthcare": "You are a healthcare admin assistant.",
+        "product": "You are a product assistant.",
+        "general": "You are a helpful assistant.",
+    }
+
+    def get_domain_prompt(self, domain: str) -> str:
+        return self.DOMAIN_PROMPTS.get(domain, self.DOMAIN_PROMPTS["general"])
+
+    async def get_domain_context(self, domain: str, user_id: str, thread_id: str) -> Dict[str, Any]:
+        return {}
 
     async def register_all_tools(self, tool_registry: ToolRegistry):
         """Connect to each MCP client, fetch tools, and register them."""

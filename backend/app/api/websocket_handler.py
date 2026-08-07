@@ -20,6 +20,7 @@ from app.mcp_clients.mcp_registry import MCPRegistry
 from app.graph import create_graph
 from app.core import instances
 from app.core.errors import TaskErrorCode, to_user_error
+from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -50,6 +51,8 @@ async def stream_task_events(
     """
     task_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    sandbox_manager = SandboxManager()
+    sandbox_task_id = f"task:{task_id}"
 
     # Use global instances if not provided
     if tool_registry is None:
@@ -105,6 +108,9 @@ async def stream_task_events(
     yield {"type": "task_start", "task_id": task_id, "message": user_message, "timestamp": now}
 
     try:
+        set_active_sandbox_manager(sandbox_manager)
+        set_active_task_id(sandbox_task_id)
+        initial_state["sandbox_id"] = sandbox_task_id
         async for event in graph.astream(initial_state, config=config):
             event_type = list(event.keys())[0]
             node_output = event[event_type]
@@ -151,6 +157,10 @@ async def stream_task_events(
             "message": user_message,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+    finally:
+        set_active_sandbox_manager(None)
+        set_active_task_id(None)
+        await sandbox_manager.destroy(sandbox_task_id)
 
 
 async def websocket_endpoint(

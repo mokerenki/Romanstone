@@ -51,9 +51,7 @@ class Planner:
                 state["done"] = True
                 state["status"] = "completed"
                 if not state.get("final_answer"):
-                    state["final_answer"] = (
-                        "Task completed with current plan after maximum replanning iterations."
-                    )
+                    state["final_answer"] = await self._synthesize_fallback_answer(state)
         else:
             self.replan_count = 0
             plan = await self.generate_plan(overall_goal, context, image_data, user_id, thread_id)
@@ -171,6 +169,46 @@ class Planner:
         except Exception as e:
             logger.error("planner.replan_failed", error=str(e), exc_info=True)
             return self.current_plan
+
+    async def _synthesize_fallback_answer(self, state: dict) -> str:
+        """
+        Called when the replan cap is hit with no verified final answer yet.
+        Synthesizes the agent's best attempt from whatever was actually
+        gathered, instead of returning a static placeholder string.
+        """
+        results = state.get("results", [])
+        if not results:
+            return (
+                "I wasn't able to find a confident answer to this within the "
+                "allotted attempts. You may want to try rephrasing the question "
+                "or breaking it into smaller parts."
+            )
+
+        context_parts = []
+        for r in results:
+            if isinstance(r, dict):
+                context_parts.append(f"Step: {r.get('step', '')}\nResult: {r.get('output', '')}")
+            else:
+                context_parts.append(str(r))
+        context = "\n\n".join(context_parts)
+
+        prompt = f"""Based on everything gathered below, give the best possible answer to the
+user's original question, even if the information is incomplete or not fully verified.
+Be upfront and concise about any uncertainty rather than omitting it. Do not include raw
+JSON, tool names, or step numbers -- write a direct, well-written answer.
+
+User's original question: {state.get('task', '')}
+
+Gathered information:
+{context}
+"""
+        try:
+            response = await self.model_router.route("fallback", [HumanMessage(content=prompt)])
+            return response.content
+        except Exception as exc:
+            logger.error("planner.fallback_synthesis_failed", error=str(exc), exc_info=True)
+            # last resort: the most recent raw result, better than nothing
+            return results[-1].get("output", "Task could not be completed.") if isinstance(results[-1], dict) else str(results[-1])
 
     def get_current_plan(self) -> List[Dict[str, Any]]:
         return self.current_plan

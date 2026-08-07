@@ -89,6 +89,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://aether:aether@postgres:5432/aether
       COGNEE_ENABLED: "true"
       SANDBOX_ENABLED: "true"
+      SANDBOX_RUNTIME: "e2b"
+      E2B_API_KEY: ${E2B_API_KEY:-}
       RBAC_ENABLED: "false"
       MORNING_BRIEFING_TIME: ${MORNING_BRIEFING_TIME:-05:00}
       # CORS is same-origin through nginx now, but keep this set in case
