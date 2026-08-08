@@ -1,6 +1,11 @@
+import asyncio
+from typing import Any, Dict, List, Optional, Set
 from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
+
 from app.tools.registry import ToolRegistry
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
+from app.core.context_compression import compress_context
+from app.core.exceptions import ToolConfirmationRequired
 
 
 class ExecutorNode:
@@ -21,80 +26,76 @@ class ExecutorNode:
             new_state["done"] = True
             return new_state
 
-        step = plan[current_step]
-        tool_name = step.get("tool_name")
-
-        if tool_name:
-            tool = self.registry.get(tool_name)
-            if tool:
-                try:
-                    result = await tool.execute(**step.get("tool_args", {}))
-                    output = result.get("output", "") if isinstance(result, dict) else str(result)
-                except Exception as e:
-                    output = f"Error executing tool '{tool_name}': {e}"
+        # ── Build dependency graph ────────────────────────────────
+        dependencies: Dict[int, Set[int]] = {}
+        for i, step in enumerate(plan):
+            deps = step.get("depends_on")
+            if deps is None and i > 0:
+                dependencies[i] = {i - 1}
+            elif deps is None and i == 0:
+                dependencies[i] = set()
             else:
-                output = f"Error: Tool '{tool_name}' not found."
-            results.append({
-                "step": step.get("description", ""),
-                "tool": tool_name,
-                "output": output
-            })
-        else:
-            context_parts = []
-            for r in results:
-                if isinstance(r, dict):
-                    context_parts.append(f"Step: {r.get('step', '')}\nResult: {r.get('output', '')}")
-                else:
-                    context_parts.append(str(r))
-            context = "\n\n".join(context_parts)
+                dependencies[i] = set(deps)
 
-            description = step.get("description", "Complete the task")
-            prompt = f"""Based on the information gathered, complete the following action.
+        completed_indices = set(range(current_step))
+        ready_steps = []
+        for i in range(current_step, len(plan)):
+            if dependencies[i].issubset(completed_indices):
+                ready_steps.append(i)
+            else:
+                break
 
-Action: {description}
+        if not ready_steps:
+            new_state = {**state}
+            new_state["current_step"] = len(plan)
+            new_state["status"] = "completed"
+            new_state["done"] = True
+            return new_state
 
-Context from previous steps:
-{context}
+        # ── Execute ready steps in parallel ───────────────────────
+        step_futures = [self._execute_step(plan[i], i, state) for i in ready_steps]
+        step_results = await asyncio.gather(*step_futures, return_exceptions=True)
 
-User's original task: {state['task']}
+        for idx, result in zip(ready_steps, step_results):
+            if isinstance(result, Exception):
+                results.append({
+                    "step": plan[idx].get("description", ""),
+                    "tool": plan[idx].get("tool_name"),
+                    "output": f"Error executing step {idx}: {result}",
+                    "step_index": idx,
+                })
+            else:
+                results.append(result)
 
-If this is a final answer, write a clear, complete, and concise paragraph that directly answers the user. Do not include raw JSON or tool outputs. Use proper grammar."""
-            try:
-                llm_resp = await self.router.route("fallback", [HumanMessage(content=prompt)])
-                output = llm_resp.content
-            except Exception as e:
-                output = f"Error synthesizing step: {e}"
-            results.append({
-                "step": description,
-                "output": output
-            })
+        results.sort(key=lambda r: r.get("step_index", 0))
 
-        new_current_step = current_step + 1
+        new_current_step = max(ready_steps) + 1
         new_state = {**state}
         new_state["results"] = results
         new_state["current_step"] = new_current_step
         new_state["planning_iterations"] = state.get("planning_iterations", 0) + 1
 
-        # If that was the last step in the plan, synthesize the final answer now
-        # from everything gathered, so the Verifier can do a proper final-answer
-        # check and the graph can correctly recognize the task is complete.
+        # ── Final answer synthesis (with compressed context) ──────
         if new_current_step >= len(plan) and not state.get("final_answer"):
-            context_parts = []
-            for r in results:
-                if isinstance(r, dict):
-                    context_parts.append(f"Step: {r.get('step', '')}\nResult: {r.get('output', '')}")
-                else:
-                    context_parts.append(str(r))
-            context = "\n\n".join(context_parts)
-            final_prompt = f"""Based on all the information gathered below, write a clear, complete,
-and concise final answer to the user's original question. Do not include raw JSON,
-tool names, or step numbers -- just a direct, well-written answer.
+            context = compress_context(results, max_total_chars=8000, max_per_result=2000)
 
-User's original task: {state['task']}
+            final_prompt = f"""Answer the user's question directly. Default to 1-2 sentences for straightforward factual questions. Only exceed this if the question is genuinely complex or the honest answer requires a brief qualifier.
 
-Gathered information:
+User's question: {state['task']}
+
+Context from previous steps:
 {context}
-"""
+
+Rules:
+* Be factual and direct.
+* Base your answer strictly on the information above. Do not fill gaps with general knowledge.
+* If the context does not contain enough information, say so plainly in one sentence.
+* Give exact names, dates, and numbers when present.
+* Do not mention sources unless asked.
+* Do not add warnings about information being out of date.
+* Plain prose only — no markdown, bullets, JSON, or tool references.
+* Answer only what was asked."""
+
             try:
                 final_resp = await self.router.route("fallback", [HumanMessage(content=final_prompt)])
                 new_state["final_answer"] = final_resp.content
@@ -104,3 +105,88 @@ Gathered information:
                 )
 
         return new_state
+
+    async def _execute_step(self, step: dict, step_index: int, state: dict) -> dict:
+        tool_name = step.get("tool_name")
+        description = step.get("description", "Complete the task")
+
+        if tool_name:
+            tool = self.registry.get(tool_name)
+            if not tool:
+                return {
+                    "step": description,
+                    "tool": tool_name,
+                    "output": f"Error: Tool '{tool_name}' not found.",
+                    "step_index": step_index,
+                }
+
+            # ── Confirmation gating for irreversible tools ─────────
+            if tool.schema.irreversible:
+                confirmed_tools = state.get("confirmed_tools", {})
+                if not confirmed_tools.get(tool_name):
+                    raise ToolConfirmationRequired(
+                        tool_name=tool_name,
+                        tool_args=step.get("tool_args", {}),
+                        step_description=description,
+                        step_index=step_index,
+                    )
+
+            try:
+                result = await asyncio.wait_for(
+                    tool.execute(**step.get("tool_args", {})),
+                    timeout=60.0,
+                )
+                output = result.get("output", "") if isinstance(result, dict) else str(result)
+            except asyncio.TimeoutError:
+                output = f"Error executing tool '{tool_name}': timed out after 60s"
+            except Exception as e:
+                output = f"Error executing tool '{tool_name}': {e}"
+
+            # ── Bulky output truncation ────────────────────────────
+            original_len = len(output)
+            if original_len > 4000:
+                output = output[:3000] + f"\n...[output truncated from {original_len} chars]"
+
+            return {
+                "step": description,
+                "tool": tool_name,
+                "output": output,
+                "step_index": step_index,
+            }
+        else:
+            # LLM synthesis step
+            context = compress_context(
+                state.get("results", []),
+                max_total_chars=6000,
+                max_per_result=1500,
+            )
+
+            prompt = f"""Answer the user's question directly. Default to 1-2 sentences.
+
+User's question: {state['task']}
+
+Context from previous steps:
+{context}
+
+Rules:
+* Be factual and direct.
+* If the answer is a simple fact, state it plainly.
+* Base your answer strictly on the information in "Context from previous steps" -- do not fill gaps with your own general knowledge, and do not guess.
+* If the context does not contain enough information to answer confidently, say so plainly in one sentence rather than guessing.
+* If the context contains conflicting information, prefer the most recent or most authoritative source and answer with that.
+* Give exact names, dates, and numbers when the context contains them.
+* Do not add warnings about information being out of date.
+* Do not include markdown formatting, bullet points, raw JSON, or references to tools/steps -- plain prose only.
+* Answer only what was asked."""
+
+            try:
+                llm_resp = await self.router.route("fallback", [HumanMessage(content=prompt)])
+                output = llm_resp.content
+            except Exception as e:
+                output = f"Error synthesizing step: {e}"
+
+            return {
+                "step": description,
+                "output": output,
+                "step_index": step_index,
+            }

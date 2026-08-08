@@ -8,7 +8,7 @@ from starlette.websockets import WebSocketDisconnect
 
 import redis.asyncio as aioredis
 import structlog
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, BackgroundTasks
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
 
@@ -32,6 +32,10 @@ router = APIRouter()
 
 redis_client: Optional[aioredis.Redis] = None
 _checkpointer_instance: Optional[RedisCheckpointer] = None
+
+# In-memory task status store (use Redis in production for multi-replica)
+# Maps task_id -> status dict
+_task_status_store: Dict[str, Dict[str, Any]] = {}
 
 def get_checkpointer() -> RedisCheckpointer:
     global _checkpointer_instance
@@ -73,7 +77,7 @@ async def get_redis_client() -> aioredis.Redis:
 async def create_proactive_task_to_queue(task_description: str, context: str = "", user_id: str = "heartbeat", tenant_id: str = "default", priority: str = "medium", action_type: str = "proactive_monitoring") -> Dict[str, Any]:
     """Creates a proactive task and dispatches it to a Redis Stream for asynchronous processing by a worker."""
     task_id = str(uuid.uuid4())
-    thread_id = str(uuid.uuid4()) # Each proactive task gets its own thread for isolation
+    thread_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
 
     logger.info("proactive_task.creating_and_queuing", task_id=task_id, task_description=task_description, priority=priority)
@@ -92,7 +96,6 @@ async def create_proactive_task_to_queue(task_description: str, context: str = "
 
     try:
         redis = await get_redis_client()
-        # Push task to a Redis Stream. The 'payload' field contains the JSON serialized task.
         await redis.xadd("proactive_tasks_stream", {"payload": json.dumps(task_payload).encode("utf-8")})
         logger.info("proactive_task.dispatched_to_redis_stream", task_id=task_id, stream="proactive_tasks_stream")
         return {"status": "dispatched_to_queue", "task_id": task_id}
@@ -101,61 +104,112 @@ async def create_proactive_task_to_queue(task_description: str, context: str = "
         logger.error("proactive_task.dispatch_failed_redis", task_id=task_id, error=str(exc), traceback=error_trace, exc_info=True)
         raise
 
+
+# ── Background task runner ──────────────────────────────────────
+
+async def _run_task_async(task_id: str, user_message: str, user_id: str, tenant_id: str, thread_id: str):
+    """Run the agent graph asynchronously and update status store."""
+    _task_status_store[task_id] = {
+        "task_id": task_id,
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "final_answer": None,
+        "plan": None,
+        "verification": None,
+        "cost_metrics": None,
+        "error": None,
+    }
+
+    graph = create_graph(_router, _domain_router, _registry, _checkpointer)
+
+    initial_state = {
+        "task_id": task_id,
+        "task": user_message,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "messages": [HumanMessage(content=user_message)],
+        "plan": [],
+        "current_step": 0,
+        "tool_calls": [],
+        "verification": None,
+        "needs_replan": False,
+        "final_answer": None,
+        "status": "pending",
+        "cost_metrics": {
+            "kimi_input_tokens": 0, "kimi_output_tokens": 0,
+            "deepseek_input_tokens": 0, "deepseek_output_tokens": 0,
+            "total_cost_usd": 0.0, "tool_calls": 0,
+        },
+        "planning_iterations": 0,
+        "scratchpad": "",
+    }
+
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "aether"}}
+    try:
+        final_state = await graph.ainvoke(initial_state, config=config)
+        _task_status_store[task_id].update({
+            "status": final_state.get("status", "completed"),
+            "final_answer": final_state.get("final_answer"),
+            "plan": final_state.get("plan"),
+            "verification": final_state.get("verification"),
+            "cost_metrics": final_state.get("cost_metrics"),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.info("task_async.completed", task_id=task_id)
+    except Exception as exc:
+        error_trace = traceback.format_exc()
+        logger.exception("task_async.failed", task_id=task_id, error=str(exc))
+        _task_status_store[task_id].update({
+            "status": "failed",
+            "error": str(exc),
+            "trace": error_trace.splitlines()[-5:],
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+
+# ── API Endpoints ───────────────────────────────────────────────
+
 @router.get("/health")
 async def health():
     return {"status": "healthy", "phase": "0"}
 
 
 @router.post("/tasks")
-async def create_task(request: Dict[str, Any]):
-    """Synchronous task execution (non-streaming)."""
+async def create_task(request: Dict[str, Any], background_tasks: BackgroundTasks):
+    """
+    Asynchronous task creation (non-blocking).
+    Returns immediately with task_id. Poll GET /tasks/{task_id}/status for results
+    or connect to WebSocket /ws for streaming events.
+    """
     user_message = request.get("message", "")
     user_id = request.get("user_id", "anonymous")
     tenant_id = request.get("tenant_id", "default")
     thread_id = request.get("thread_id") or str(uuid.uuid4())
     task_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
 
-    from app.graph import create_graph
+    if not user_message.strip():
+        return JSONResponse(status_code=400, content={"detail": "message is required"})
 
-    graph = create_graph(_router, _domain_router, _registry, _checkpointer)
+    logger.info("task.queued", task_id=task_id, thread_id=thread_id, user_id=user_id)
 
-    initial_state = {
-        "task_id": task_id,"task": user_message, "user_id": user_id, "tenant_id": tenant_id,
-        "messages": [HumanMessage(content=user_message)],
-        "plan": [], "current_step": 0, "tool_calls": [],
-        "verification": None, "needs_replan": False, "final_answer": None,
-        "status": "pending", "cost_metrics": {
-            "kimi_input_tokens": 0, "kimi_output_tokens": 0,
-            "deepseek_input_tokens": 0, "deepseek_output_tokens": 0,
-            "total_cost_usd": 0.0, "tool_calls": 0,
-        },
-        "planning_iterations": 0, "scratchpad": "",
-    }
-
-    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": "aether"}}
-    try:
-        final_state = await graph.ainvoke(initial_state, config=config)
-    except Exception as exc:
-        error_trace = traceback.format_exc()
-        logger.exception("task_execution_failed", error=str(exc), traceback=error_trace)
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Task execution failed.",
-                "error": str(exc),
-                "trace": error_trace.splitlines()[-5:],
-            },
-        )
+    # Kick off background execution
+    background_tasks.add_task(_run_task_async, task_id, user_message, user_id, tenant_id, thread_id)
 
     return {
-        "task_id": final_state["task_id"],
-        "status": final_state["status"],
-        "final_answer": final_state.get("final_answer"),
-        "plan": final_state.get("plan"),
-        "verification": final_state.get("verification"),
-        "cost_metrics": final_state.get("cost_metrics"),
+        "task_id": task_id,
+        "thread_id": thread_id,
+        "status": "queued",
+        "message": "Task accepted. Use WebSocket /ws or poll /tasks/{task_id}/status for results.",
     }
+
+
+@router.get("/tasks/{task_id}/status")
+async def get_task_status(task_id: str):
+    """Poll for task status and final answer."""
+    status = _task_status_store.get(task_id)
+    if not status:
+        return JSONResponse(status_code=404, content={"detail": "Task not found"})
+    return status
 
 
 @router.post("/agent/tools/memory_retriever")
@@ -205,7 +259,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 tool_registry = instances.tool_registry
                 domain_router = instances.domain_router
 
-                # ✅ Now passing all 9 arguments (browser_service can be None)
                 async for event in stream_task_events(
                     user_message,
                     user_id,

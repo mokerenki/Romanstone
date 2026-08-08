@@ -19,6 +19,7 @@ from app.agents.router import DomainRouter
 from app.mcp_clients.mcp_registry import MCPRegistry
 from app.graph import create_graph
 from app.core import instances
+from app.core.exceptions import ToolConfirmationRequired
 from app.core.errors import TaskErrorCode, to_user_error
 from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
 
@@ -111,6 +112,7 @@ async def stream_task_events(
         set_active_sandbox_manager(sandbox_manager)
         set_active_task_id(sandbox_task_id)
         initial_state["sandbox_id"] = sandbox_task_id
+        
         async for event in graph.astream(initial_state, config=config):
             event_type = list(event.keys())[0]
             node_output = event[event_type]
@@ -127,13 +129,6 @@ async def stream_task_events(
             else:
                 logger.debug("unknown_graph_event", event_type=event_type)
 
-        # NOTE: deliberately not special-casing "__end__" above -- LangGraph's
-        # astream() does not reliably emit a distinct end event; it simply
-        # stops iterating once the graph reaches END. task_complete is always
-        # sent explicitly here, after the loop, using the authoritative final
-        # state from the checkpointer -- this guarantees the frontend always
-        # gets exactly one definitive completion signal, regardless of how
-        # the graph internally terminated.
         snapshot = await graph.aget_state(config)
         final_state = snapshot.values if snapshot and snapshot.values else initial_state
 
@@ -146,6 +141,19 @@ async def stream_task_events(
             "verification": final_state.get("verification"),
             "cost_metrics": final_state.get("cost_metrics"),
             "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    except ToolConfirmationRequired as exc:
+        # Emit confirmation event and pause — client must send confirm_tool to resume
+        logger.info("websocket.confirmation_required", tool=exc.tool_name, step=exc.step_index)
+        yield {
+            "type": "needs_confirmation",
+            "tool_name": exc.tool_name,
+            "tool_args": exc.tool_args,
+            "step_description": exc.step_description,
+            "step_index": exc.step_index,
+            "task_id": task_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as exc:

@@ -50,7 +50,8 @@ class WhatsAppTool(BaseTool):
                     "description": "URL to media file (image, video, audio, document)"
                 }
             },
-            required=["action", "to"]
+            required=["action", "to"],
+            irreversible=True,
         )
 
     async def execute(self, **kwargs) -> Dict[str, Any]:

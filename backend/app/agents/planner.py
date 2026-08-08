@@ -63,15 +63,12 @@ class Planner:
         return state
 
     def _build_context(self, state: dict) -> str:
-        parts = []
-        if state.get("results"):
-            parts.append("Previous Results:")
-            for r in state["results"]:
-                if isinstance(r, dict):
-                    parts.append(f"  - {r.get('step', '')}: {r.get('output', '')}")
-                else:
-                    parts.append(f"  - {r}")
-        return "\n".join(parts)
+        from app.core.context_compression import compress_context
+        return compress_context(
+            state.get("results", []),
+            max_total_chars=5000,
+            max_per_result=1200,
+        )
 
     async def generate_plan(
         self,

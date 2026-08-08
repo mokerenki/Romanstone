@@ -6,7 +6,6 @@ from typing import Optional
 
 from app.core import instances
 
-
 import redis.asyncio as aioredis
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +20,7 @@ from app.api.integrations import router as integrations_router
 from app.core.config import settings
 from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
+from app.core.redis_checkpointer import RedisCheckpointer
 from app.memory.cognee_setup import CogneeMemory
 from app.mcp_clients.mcp_registry import MCPRegistry
 from app.agents.router import DomainRouter
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     """
     logger.info("application.startup")
 
-    # Initialize Redis client for checkpointer and task queue
+    # Initialize Redis client for checkpointer, task queue, and embedding cache
     app.state.redis_client = aioredis.from_url(settings.redis_url)
     await app.state.redis_client.ping()
     logger.info("redis.connected")
@@ -51,26 +51,27 @@ async def lifespan(app: FastAPI):
     app.state.model_router = KimiDeepSeekRouter()
     logger.info("model_router.initialized")
 
-    # Initialize Cognee Memory
+    # Initialize Redis Checkpointer (PRODUCTION-GRADE — survives restarts)
+    app.state.checkpointer = RedisCheckpointer(
+        redis_client=app.state.redis_client,
+        namespace="aether",
+        ttl_hours=24,
+    )
+    tasks_router.checkpointer = app.state.checkpointer
+    logger.info("checkpointer.initialized", type="redis")
+
+    # Initialize Cognee Memory (with Redis embedding cache)
     app.state.cognee_memory = CogneeMemory(config={
         "qdrant_host": os.getenv("QDRANT_HOST", "qdrant"),
         "qdrant_port": int(os.getenv("QDRANT_PORT", "6333")),
         "kuzu_db_path": os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
         "embedding_model_name": os.getenv("OPENAI_EMBEDDING_MODEL", "nvidia/nv-embed-v1"),
         "llm_extraction_model_name": os.getenv("OPENAI_CHAT_MODEL", "meta/llama-3.3-70b-instruct"),
+        "redis_url": settings.redis_url,  # <-- NEW: for embedding cache
     })
     await app.state.cognee_memory.initialize()
     memory_api.cognee_memory = app.state.cognee_memory
     logger.info("cognee_memory.initialized")
-
-    # Initialize Redis Checkpointer
-    # Initialize Checkpointer
-    # TEMP: using LangGraph's built-in InMemorySaver until RedisCheckpointer
-    # properly implements the BaseCheckpointSaver interface (see backend/app/core/redis_checkpointer.py)
-    from langgraph.checkpoint.memory import InMemorySaver
-    app.state.checkpointer = InMemorySaver()
-    tasks_router.checkpointer = app.state.checkpointer
-    logger.info("checkpointer.initialized")
 
     # Initialize Browser Automation Service
     app.state.browser_service = BrowserAutomationService()
@@ -78,23 +79,17 @@ async def lifespan(app: FastAPI):
     logger.info("browser_service.initialized")
 
     # ------------------- TOOL REGISTRY & MCP -------------------
-    # 1. Create the central tool registry
     app.state.tool_registry = ToolRegistry()
-
-    # 2. Register built-in tools
     app.state.tool_registry.register(BrowserTool())
     app.state.tool_registry.register(PythonREPLTool())
     app.state.tool_registry.register(WhatsAppTool())
-    # Memory retriever needs the cognee_memory instance
     app.state.tool_registry.register(MemoryRetrieverTool(app.state.cognee_memory))
     logger.info("builtin_tools.registered")
 
-    # 3. Initialize MCP registry and register MCP tools
     app.state.mcp_registry = MCPRegistry()
     await app.state.mcp_registry.register_all_tools(app.state.tool_registry)
     logger.info("mcp_tools.registered")
 
-    # 4. Create Domain Router (uses model_router and mcp_registry)
     app.state.domain_router = DomainRouter(
         model_router=app.state.model_router,
         mcp_registry=app.state.mcp_registry
@@ -105,6 +100,7 @@ async def lifespan(app: FastAPI):
     app.state.proactive_scheduler = ProactiveScheduler(
         model_router=app.state.model_router,
         cognee_memory=app.state.cognee_memory,
+        redis_client=app.state.redis_client,  # <-- NEW: for persistent scheduling
         briefing_time_str=os.getenv("MORNING_BRIEFING_TIME", "08:00")
     )
     asyncio.create_task(app.state.proactive_scheduler.start())
@@ -141,10 +137,12 @@ async def lifespan(app: FastAPI):
         logger.info("mcp_registry.closed")
 
 
-app = FastAPI(lifespan=lifespan,
-              title="Aether Autonomous Agent Backend",
-              description="Backend for the Aether autonomous agent, featuring memory, planning, and execution capabilities.",
-              version="0.1.0")
+app = FastAPI(
+    lifespan=lifespan,
+    title="Aether Autonomous Agent Backend",
+    description="Backend for the Aether autonomous agent, featuring memory, planning, and execution capabilities.",
+    version="0.1.0"
+)
 
 # CORS Middleware
 cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
@@ -162,7 +160,7 @@ app.include_router(tasks_router)
 app.include_router(memory_api_router)
 app.include_router(integrations_router)
 
-# WebSocket endpoint – now passes tool_registry as well
+# WebSocket endpoint
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await websocket_endpoint(
@@ -171,8 +169,8 @@ async def websocket_route(websocket: WebSocket):
         checkpointer=app.state.checkpointer,
         model_router=app.state.model_router,
         browser_service=app.state.browser_service,
-        tool_registry=app.state.tool_registry,   # <-- NEW
-        domain_router=app.state.domain_router    # <-- NEW (optional, can be used inside)
+        tool_registry=app.state.tool_registry,
+        domain_router=app.state.domain_router
     )
 
 

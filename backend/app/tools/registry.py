@@ -22,6 +22,7 @@ class ToolSchema:
     required: List[str] = field(default_factory=list)
     # Phase 2: sandbox template for isolated execution
     sandbox_template: Optional[str] = None
+    irreversible: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {

@@ -31,6 +31,21 @@ class Verifier:
         overall_goal = state.get("task", "")
         context = self._build_context(state)
 
+        if final_answer:
+            any_tools_used = any(
+                isinstance(r, dict) and r.get("tool")
+                for r in state.get("results", [])
+            )
+            if not any_tools_used:
+                state["verification"] = {
+                    "status": "PASS",
+                    "score": 95,
+                    "feedback": "Direct answer — no tools used, no verification needed.",
+                }
+                state["done"] = True
+                state["status"] = "completed"
+                return state
+        
         # If we have a final answer, verify it
         if final_answer:
             verification = await self.verify_final_answer(overall_goal, final_answer, context)

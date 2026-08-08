@@ -1,5 +1,6 @@
 import asyncio
 import json
+import hashlib
 from app.memory.temporal_setup import TemporalGraph
 import os
 import uuid
@@ -14,13 +15,19 @@ from qdrant_client import QdrantClient, models
 import kuzu
 
 # OpenAI for Embeddings and LLM for Entity Extraction
-from openai import AsyncOpenAI # Or your preferred LLM client
+from openai import AsyncOpenAI
 
 # Local imports
 from app.memory.graph_setup import KuzuGraph
 from app.memory.domain_schemas import EXECUTIVE_SCHEMA
 
+# Redis for embedding cache
+import redis.asyncio as aioredis
+
 logger = structlog.get_logger("aether.memory.cognee_setup")
+
+EMBEDDING_CACHE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
+
 
 class CogneeMemory:
     """Orchestrates memory operations: ingestion, embedding, vector store (Qdrant), and graph store (KuzuDB) interaction."""
@@ -33,6 +40,7 @@ class CogneeMemory:
         self.qdrant_client: Optional[QdrantClient] = None
         self.kuzu_graph: Optional[KuzuGraph] = None
         self.openai_client: Optional[AsyncOpenAI] = None
+        self._redis_client: Optional[aioredis.Redis] = None  # <-- NEW
 
         self.qdrant_collection_name = self.config.get("qdrant_collection_name", "aether_memory")
         self.embedding_model_name = self.config.get(
@@ -46,7 +54,7 @@ class CogneeMemory:
         self.embedding_dim = self.config.get("embedding_dim", 4096)
 
     async def initialize(self):
-        """Connects to Qdrant, KuzuDB, and initializes LLM clients, setting up schemas."""
+        """Connects to Qdrant, KuzuDB, Redis, and initializes LLM clients, setting up schemas."""
         if self._initialized:
             logger.info("cognee_memory.already_initialized")
             return
@@ -54,8 +62,10 @@ class CogneeMemory:
         logger.info("cognee_memory.initializing")
         try:
             # Initialize Qdrant Client
-            self.qdrant_client = QdrantClient(host=self.config.get("qdrant_host", "localhost"), port=self.config.get("qdrant_port", 6333))
-            # Ensure collection exists
+            self.qdrant_client = QdrantClient(
+                host=self.config.get("qdrant_host", "localhost"),
+                port=self.config.get("qdrant_port", 6333)
+            )
             self.qdrant_client.recreate_collection(
                 collection_name=self.qdrant_collection_name,
                 vectors_config=models.VectorParams(size=self.embedding_dim, distance=models.Distance.COSINE)
@@ -65,25 +75,82 @@ class CogneeMemory:
             # Initialize KuzuDB Graph
             kuzu_db_path = self.config.get("kuzu_db_path", "/tmp/aether/kuzu.db")
             self.kuzu_graph = KuzuGraph(db_path=kuzu_db_path)
-            self.kuzu_graph.initialize(schema=self._schema) # Pass schema to graph setup
+            self.kuzu_graph.initialize(schema=self._schema)
             logger.info("kuzu_graph.initialized", db_path=kuzu_db_path)
 
-            # Initialize OpenAI Client (for embeddings and entity extraction)
+            # Initialize OpenAI Client
             openai_api_key = os.environ.get("OPENAI_API_KEY")
             if not openai_api_key:
                 raise RuntimeError("OPENAI_API_KEY is required for CogneeMemory embeddings and entity extraction.")
             openai_api_base = os.environ.get("OPENAI_API_BASE")
             self.openai_client = AsyncOpenAI(
                 api_key=openai_api_key,
-                base_url=openai_api_base # Use custom base_url if configured
+                base_url=openai_api_base
             )
             logger.info("openai.client_initialized")
+
+            # Initialize Redis for embedding cache  <-- NEW
+            redis_url = self.config.get("redis_url")
+            if redis_url:
+                self._redis_client = aioredis.from_url(redis_url)
+                await self._redis_client.ping()
+                logger.info("embedding_cache.redis_connected", redis_url=redis_url)
 
             self._initialized = True
             logger.info("cognee_memory.initialized_success")
         except Exception as e:
             logger.error("cognee_memory.initialization_failed", error=str(e), exc_info=True)
             raise
+
+    # ── Embedding Cache Helpers ───────────────────────────────────
+
+    def _embedding_cache_key(self, text: str) -> str:
+        """Deterministic cache key for an embedding payload."""
+        payload = f"{self.embedding_model_name}:{text}"
+        return f"aether:embedding:{hashlib.sha256(payload.encode()).hexdigest()}"
+
+    async def _get_cached_embedding(self, text: str) -> Optional[List[float]]:
+        """Fetch embedding from Redis cache if available."""
+        if not self._redis_client:
+            return None
+        key = self._embedding_cache_key(text)
+        cached = await self._redis_client.get(key)
+        if cached:
+            logger.debug("embedding_cache.hit", key=key[:16])
+            return json.loads(cached)
+        return None
+
+    async def _set_cached_embedding(self, text: str, embedding: List[float]) -> None:
+        """Store embedding in Redis cache with TTL."""
+        if not self._redis_client:
+            return
+        key = self._embedding_cache_key(text)
+        await self._redis_client.setex(
+            key,
+            EMBEDDING_CACHE_TTL_SECONDS,
+            json.dumps(embedding),
+        )
+        logger.debug("embedding_cache.set", key=key[:16])
+
+    async def _generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding with caching layer."""
+        # 1. Check cache
+        cached = await self._get_cached_embedding(text)
+        if cached is not None:
+            return cached
+
+        # 2. Call API
+        embedding_response = await self.openai_client.embeddings.create(
+            input=text,
+            model=self.embedding_model_name
+        )
+        embedding = embedding_response.data[0].embedding
+
+        # 3. Store in cache
+        await self._set_cached_embedding(text, embedding)
+        return embedding
+
+    # ── Ingest ────────────────────────────────────────────────────
 
     async def ingest(self, event: Dict[str, Any]):
         """Ingests an event, generates embeddings, extracts entities/relationships, and updates vector + graph stores."""
@@ -102,23 +169,19 @@ class CogneeMemory:
         logger.info("cognee_memory.ingesting_event", event_id=event_id, content_len=len(content), source=source)
 
         try:
-            # 1. Generate embeddings for the content
-            embedding_response = await self.openai_client.embeddings.create(
-                input=content,
-                model=self.embedding_model_name
-            )
-            embedding = embedding_response.data[0].embedding
+            # 1. Generate embeddings (with cache)
+            embedding = await self._generate_embedding(content)
             logger.debug("cognee_memory.embedding_generated", event_id=event_id)
 
-            # 2. Store in Qdrant (vector store)
+            # 2. Store in Qdrant
             qdrant_point = models.PointStruct(
-                id=str(uuid.UUID(event_id)), # Qdrant expects UUID or int for ID
+                id=str(uuid.UUID(event_id)),
                 vector=embedding,
                 payload={
                     "content": content,
                     "timestamp": timestamp,
                     "source": source,
-                    "event_id": event_id # Store original event_id as payload for retrieval
+                    "event_id": event_id
                 }
             )
             operation_info = self.qdrant_client.upsert(
@@ -128,13 +191,13 @@ class CogneeMemory:
             )
             logger.debug("qdrant.upsert_complete", event_id=event_id, status=operation_info.status.name)
 
-            # 3. Extract entities and relationships using LLM
+            # 3. Extract entities and relationships
             extracted_data = await self._extract_entities_and_relationships_llm(content)
             entities = extracted_data.get("entities", [])
             relationships = extracted_data.get("relationships", [])
             logger.debug("cognee_memory.llm_extraction_complete", event_id=event_id, entities_count=len(entities), relationships_count=len(relationships))
 
-            # 4. Store in KuzuDB (graph store)
+            # 4. Store in KuzuDB
             await self._update_kuzu_graph(event_id, content, entities, relationships, timestamp)
 
             logger.info("cognee_memory.ingestion_complete", event_id=event_id, entities_count=len(entities), relationships_count=len(relationships))
@@ -171,7 +234,7 @@ class CogneeMemory:
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.1 # Keep it deterministic for extraction
+                temperature=0.1
             )
             content = response.choices[0].message.content
             if content:
@@ -187,61 +250,49 @@ class CogneeMemory:
             logger.error("kuzu_graph.not_initialized_for_update")
             return
 
-        # Add a node for the ingested document/event itself
         doc_id = f"DOC-{event_id}"
         self.kuzu_graph.add_node(
             label="Document",
             properties={
                 "id": doc_id,
-                "content_summary": content[:200], # Store a summary
-                "full_content_qdrant_id": str(uuid.UUID(event_id)), # Link to Qdrant vector
+                "content_summary": content[:200],
+                "full_content_qdrant_id": str(uuid.UUID(event_id)),
                 "timestamp": timestamp,
-                "valid_from": timestamp, # Temporal metadata for the document itself
+                "valid_from": timestamp,
                 "valid_to": datetime.max.replace(tzinfo=timezone.utc).isoformat()
             }
         )
 
-        # Add extracted entities
         for entity in entities:
             entity_type = entity.get("type")
             entity_id = entity.get("id")
             properties = entity.get("properties", {})
             if entity_type and entity_id:
-                # Ensure temporal properties are set for entities
                 properties["valid_from"] = properties.get("valid_from", timestamp)
                 properties["valid_to"] = properties.get("valid_to", datetime.max.replace(tzinfo=timezone.utc).isoformat())
                 self.kuzu_graph.add_node(label=entity_type, properties=properties)
-                # Link document to entities it contains
                 self.kuzu_graph.add_edge(from_label="Document", from_id=doc_id, to_label=entity_type, to_id=entity_id, rel_type="CONTAINS_ENTITY")
 
-        # Add extracted relationships
         for rel in relationships:
             rel_type = rel.get("type")
             source_id = rel.get("source_id")
             target_id = rel.get("target_id")
             properties = rel.get("properties", {})
             if rel_type and source_id and target_id:
-                # Ensure temporal properties are set for relationships
                 properties["valid_from"] = properties.get("valid_from", timestamp)
                 properties["valid_to"] = properties.get("valid_to", datetime.max.replace(tzinfo=timezone.utc).isoformat())
-                # Need to infer source/target labels from schema or by querying Kuzu
-                # For simplicity, assuming source/target IDs directly map to node IDs and labels are known
-                source_label = self._get_entity_label_from_id(source_id) # Helper needed
-                target_label = self._get_entity_label_from_id(target_id) # Helper needed
+                source_label = self._get_entity_label_from_id(source_id)
+                target_label = self._get_entity_label_from_id(target_id)
                 if source_label and target_label:
                     self.kuzu_graph.add_edge(from_label=source_label, from_id=source_id, to_label=target_label, to_id=target_id, rel_type=rel_type, properties=properties)
                 else:
                     logger.warning("cognee_memory.cannot_infer_labels", source_id=source_id, target_id=target_id, rel_type=rel_type)
 
     def _get_entity_label_from_id(self, entity_id: str) -> Optional[str]:
-        """Helper to infer entity label from its ID, potentially by querying Kuzu or checking schema."""
-        # This is a simplification. In a real system, you might query KuzuDB
-        # or maintain a mapping of ID patterns to labels.
+        """Helper to infer entity label from its ID."""
         for entity_name, entity_def in self._schema.get("entities", {}).items():
-            # Simple heuristic: if ID contains a known entity type prefix
             if entity_name.upper() in entity_id.upper():
                 return entity_name
-        # Fallback if not found, or query KuzuDB: MATCH (n) WHERE n.id = 'entity_id' RETURN labels(n)
         return None
 
     async def search(self, query: str, mode: str = "semantic", top_k: int = 5, 
@@ -252,22 +303,18 @@ class CogneeMemory:
             await self.initialize()
 
         if mode == "semantic":
-            query_embedding_response = await self.openai_client.embeddings.create(
-                input=query,
-                model=self.embedding_model_name
-            )
-            query_embedding = query_embedding_response.data[0].embedding
+            # Use cached embedding for search too
+            query_embedding = await self._generate_embedding(query)
             
             search_result = self.qdrant_client.search(
                 collection_name=self.qdrant_collection_name,
                 query_vector=query_embedding,
                 limit=top_k,
-                with_payload=True # Retrieve original content and metadata
+                with_payload=True
             )
             return {"mode": "semantic", "query": query, "results": [hit.payload for hit in search_result]}
         
         elif mode == "graph":
-            # Assuming query is a Cypher query string
             if not self.kuzu_graph:
                 raise ValueError("KuzuGraph not initialized for graph query.")
             results = self.kuzu_graph.query(query)
@@ -279,7 +326,7 @@ class CogneeMemory:
             if not self.kuzu_graph:
                 raise ValueError("KuzuGraph not initialized for temporal query.")
             
-            temporal_graph = TemporalGraph(self.kuzu_graph) # Instantiate TemporalGraph with initialized KuzuGraph
+            temporal_graph = TemporalGraph(self.kuzu_graph)
             result = await temporal_graph.query_at_time(entity_id, property_name, query_time, entity_label=entity_label)
             return {
                 "mode": "temporal",
@@ -296,7 +343,6 @@ class CogneeMemory:
     async def close(self):
         """Closes all client connections."""
         if self.qdrant_client:
-            # QdrantClient doesn't have an async close in all versions, but let's try
             try:
                 self.qdrant_client.close()
             except Exception:
@@ -308,5 +354,7 @@ class CogneeMemory:
                 pass
         if self.openai_client:
             await self.openai_client.close()
+        if self._redis_client:
+            await self._redis_client.close()
         self._initialized = False
         logger.info("cognee_memory.closed")
