@@ -2,6 +2,7 @@ import asyncio
 import os
 import structlog
 from contextlib import asynccontextmanager
+from app.tools.current_time import CurrentTimeTool
 from typing import Optional
 
 from app.core import instances
@@ -84,6 +85,7 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry.register(PythonREPLTool())
     app.state.tool_registry.register(WhatsAppTool())
     app.state.tool_registry.register(MemoryRetrieverTool(app.state.cognee_memory))
+    app.state.tool_registry.register(CurrentTimeTool())
     logger.info("builtin_tools.registered")
 
     app.state.mcp_registry = MCPRegistry()

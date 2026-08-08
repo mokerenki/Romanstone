@@ -238,6 +238,47 @@ async def memory_retriever(request: Dict[str, Any]):
         logger.exception("memory_retriever.failed", error=str(exc))
         return JSONResponse(status_code=500, content={"error": "Memory retrieval failed.", "details": str(exc)})
 
+@router.get("/api/tasks/history")
+async def list_task_history(limit: int = 20):
+    """List recent task threads from the Redis checkpointer."""
+    try:
+        pattern = f"{_checkpointer.namespace}:checkpoint:*"
+        keys = await _checkpointer.redis_client.keys(pattern)
+
+        threads = []
+        seen = set()
+        for key in keys:
+            key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+            parts = key_str.split(":")
+            if len(parts) < 3:
+                continue
+            thread_id = parts[2]
+            if thread_id in seen:
+                continue
+            seen.add(thread_id)
+
+            config = {"configurable": {"thread_id": thread_id}}
+            cp = await _checkpointer.aget_tuple(config)
+            if not cp:
+                continue
+
+            # Checkpoint state lives under channel_values, not at the top level
+            values = cp.checkpoint.get("channel_values", {})
+            threads.append({
+                "thread_id": thread_id,
+                "task": values.get("task", "Unknown"),
+                "status": values.get("status", "unknown"),
+                "final_answer": values.get("final_answer"),
+                "timestamp": cp.checkpoint.get("ts") or cp.metadata.get("timestamp"),
+                "cost_metrics": values.get("cost_metrics"),
+            })
+
+        threads.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        return {"threads": threads[:limit], "total": len(seen)}
+    except Exception as exc:
+        logger.exception("task_history.failed", error=str(exc))
+        return {"threads": [], "error": str(exc)}       
+
 
 @router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
