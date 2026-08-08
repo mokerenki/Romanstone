@@ -10,7 +10,7 @@ import structlog
 logger = structlog.get_logger("aether.mcp.registry")
 
 class MCPRegistry:
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None, cognee_memory: Any = None):
         self.clients: Dict[str, MCPClient] = {}
         self.config_path = config_path or os.path.join(
             os.path.dirname(__file__), "config.yaml"

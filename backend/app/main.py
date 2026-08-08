@@ -3,6 +3,10 @@ import os
 import structlog
 from contextlib import asynccontextmanager
 from app.tools.current_time import CurrentTimeTool
+from app.tools.email_tool import EmailTool
+from app.tools.calendar_tool import CalendarTool
+from app.tools.document_tool import DocumentTool
+from app.tools.slack_tool import SlackTool
 from typing import Optional
 
 from app.core import instances
@@ -86,6 +90,10 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry.register(WhatsAppTool())
     app.state.tool_registry.register(MemoryRetrieverTool(app.state.cognee_memory))
     app.state.tool_registry.register(CurrentTimeTool())
+    app.state.tool_registry.register(EmailTool())
+    app.state.tool_registry.register(CalendarTool())
+    app.state.tool_registry.register(DocumentTool())
+    app.state.tool_registry.register(SlackTool())
     logger.info("builtin_tools.registered")
 
     app.state.mcp_registry = MCPRegistry()

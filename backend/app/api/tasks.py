@@ -37,6 +37,50 @@ _checkpointer_instance: Optional[RedisCheckpointer] = None
 # Maps task_id -> status dict
 _task_status_store: Dict[str, Dict[str, Any]] = {}
 
+_task_progress_prefix = "aether:task_progress"
+
+
+async def persist_task_progress(thread_id: str, state: Dict[str, Any]) -> None:
+    try:
+        r = await get_redis_client()
+        key = f"{_task_progress_prefix}:{thread_id}"
+        payload = {
+            "thread_id": thread_id,
+            "task": state.get("task", ""),
+            "status": state.get("status", "pending"),
+            "current_step": state.get("current_step", 0),
+            "plan": json.dumps(state.get("plan", [])),
+            "results": json.dumps(state.get("results", [])),
+            "final_answer": state.get("final_answer") or "",
+            "cost_metrics": json.dumps(state.get("cost_metrics", {})),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await r.hset(key, mapping=payload)
+        await r.expire(key, 86400)
+    except Exception as exc:
+        logger.warning("task_progress.persist_failed", thread_id=thread_id, error=str(exc))
+
+
+async def get_task_progress(thread_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        r = await get_redis_client()
+        key = f"{_task_progress_prefix}:{thread_id}"
+        data = await r.hgetall(key)
+        if not data:
+            return None
+        result = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in data.items()}
+        for field in ("plan", "results", "cost_metrics"):
+            val = result.get(field)
+            if val:
+                try:
+                    result[field] = json.loads(val)
+                except Exception:
+                    pass
+        return result
+    except Exception as exc:
+        logger.warning("task_progress.get_failed", thread_id=thread_id, error=str(exc))
+        return None
+
 def get_checkpointer() -> RedisCheckpointer:
     global _checkpointer_instance
     if _checkpointer_instance is None:
@@ -61,7 +105,7 @@ _cognee_memory = CogneeMemory(config={
 _memory_retriever_tool = MemoryRetrieverTool(_cognee_memory)
 _registry.register(_memory_retriever_tool)
 
-_mcp_registry = MCPRegistry(_cognee_memory)
+_mcp_registry = MCPRegistry()
 _domain_router = DomainRouter(_router, _mcp_registry)
 
 async def get_redis_client() -> aioredis.Redis:

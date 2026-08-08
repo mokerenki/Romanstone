@@ -35,6 +35,7 @@ async def stream_task_events(
     tool_registry: Optional[ToolRegistry] = None,
     domain_router: Optional[DomainRouter] = None,
     browser_service: Optional[BrowserAutomationService] = None,
+    extra_state: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream task execution events via WebSocket.
@@ -103,6 +104,8 @@ async def stream_task_events(
         "planning_iterations": 0,
         "scratchpad": "",
     }
+    if extra_state:
+        initial_state.update(extra_state)
 
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -119,13 +122,19 @@ async def stream_task_events(
 
             if event_type == "planner":
                 yield {"type": "planner_output", "content": node_output.get("plan"), "timestamp": datetime.now(timezone.utc).isoformat()}
+                from app.api.tasks import persist_task_progress
+                await persist_task_progress(thread_id, node_output)
             elif event_type == "executor":
                 results = node_output.get("results", [])
                 if results:
                     last_result = results[-1]
                     yield {"type": "executor_output", "content": last_result, "timestamp": datetime.now(timezone.utc).isoformat()}
+                from app.api.tasks import persist_task_progress
+                await persist_task_progress(thread_id, node_output)
             elif event_type == "verifier":
                 yield {"type": "verifier_output", "content": node_output.get("verification"), "timestamp": datetime.now(timezone.utc).isoformat()}
+                from app.api.tasks import persist_task_progress
+                await persist_task_progress(thread_id, node_output)
             else:
                 logger.debug("unknown_graph_event", event_type=event_type)
 
@@ -153,6 +162,7 @@ async def stream_task_events(
             "step_description": exc.step_description,
             "step_index": exc.step_index,
             "task_id": task_id,
+            "thread_id": thread_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -198,6 +208,62 @@ async def websocket_endpoint(
                     user_message,
                     user_id,
                     tenant_id,
+                    thread_id,
+                    checkpointer,
+                    model_router,
+                    tool_registry,
+                    domain_router,
+                    browser_service,
+                ):
+                    await websocket.send_json(event)
+            elif action == "confirm_tool":
+                thread_id = data.get("thread_id")
+                tool_name = data.get("tool_name")
+                step_index = data.get("step_index")
+                if not thread_id or not tool_name:
+                    await websocket.send_json({"type": "error", "message": "thread_id and tool_name are required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    continue
+                async for event in stream_task_events(
+                    data.get("message", ""),
+                    data.get("user_id", "anonymous"),
+                    data.get("tenant_id", "default"),
+                    thread_id,
+                    checkpointer,
+                    model_router,
+                    tool_registry,
+                    domain_router,
+                    browser_service,
+                    extra_state={"confirmed_tools": {tool_name: True}},
+                ):
+                    await websocket.send_json(event)
+            elif action == "reject_tool":
+                thread_id = data.get("thread_id")
+                step_index = data.get("step_index")
+                if not thread_id or step_index is None:
+                    await websocket.send_json({"type": "error", "message": "thread_id and step_index are required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    continue
+                async for event in stream_task_events(
+                    data.get("message", ""),
+                    data.get("user_id", "anonymous"),
+                    data.get("tenant_id", "default"),
+                    thread_id,
+                    checkpointer,
+                    model_router,
+                    tool_registry,
+                    domain_router,
+                    browser_service,
+                    extra_state={"skipped_steps": {step_index: True}},
+                ):
+                    await websocket.send_json(event)
+            elif action == "resume_task":
+                thread_id = data.get("thread_id")
+                if not thread_id:
+                    await websocket.send_json({"type": "error", "message": "thread_id is required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    continue
+                async for event in stream_task_events(
+                    data.get("message", ""),
+                    data.get("user_id", "anonymous"),
+                    data.get("tenant_id", "default"),
                     thread_id,
                     checkpointer,
                     model_router,

@@ -23,18 +23,7 @@ google_workspace:
   url: "https://public-sides-play.loca.lt/sse"
   timeout: 60.0
 
-
 google_bigquery:
   url: "https://bigquery.googleapis.com/mcp"
   headers:
     Authorization: "Bearer ${GCP_OAUTH_TOKEN}"   # Or use service account key
-
-  class MCPClient:
-    def __init__(self, name, url, headers_provider=None, ...):
-        self._headers_provider = headers_provider
-        ...
-
-    async def _get_headers(self):
-        if callable(self._headers_provider):
-            return await self._headers_provider()
-        return self.headers

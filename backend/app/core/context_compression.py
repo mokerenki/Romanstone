@@ -1,4 +1,36 @@
 from typing import Any, Dict, List, Union
+import re
+
+
+_URL_RE = re.compile(r"https?://[^\s)>\]\"']+")
+_PATH_RE = re.compile(r"(?:/tmp/aether/sandbox/[^\s)>\]\"']+|/[A-Za-z0-9_./-]+)")
+
+
+def _extract_references(text: str) -> List[str]:
+    refs: List[str] = []
+    for m in _URL_RE.finditer(text):
+        ref = m.group(0).rstrip(".,;!?)")
+        if ref not in refs:
+            refs.append(ref)
+    for m in _PATH_RE.finditer(text):
+        ref = m.group(0)
+        if ref not in refs:
+            refs.append(ref)
+    return refs
+
+
+def _truncate_with_references(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+
+    refs = _extract_references(text)
+    truncated = text[:max_chars].rstrip()
+    note = ""
+    if refs:
+        note = " [references: " + ", ".join(refs[:8]) + "]"
+    elif len(text) > max_chars:
+        note = "...[truncated]"
+    return truncated + note
 
 
 def compress_context(
@@ -12,7 +44,9 @@ def compress_context(
 
     - max_per_result: caps any single step's output so one bulky tool
       result (e.g. a large page of search results) can't dominate the
-      whole context.
+      whole context.  When a result is truncated, any URLs, file paths,
+      or sandbox paths it contained are preserved as references so the
+      agent can re-fetch the source if needed.
     - max_total_chars: caps the combined string. If capping individual
       results still isn't enough, older entries are dropped first (most
       recent steps are usually most relevant to what happens next),
@@ -30,9 +64,7 @@ def compress_context(
             step = ""
             output = str(r)
 
-        if len(output) > max_per_result:
-            output = output[:max_per_result].rstrip() + "...[truncated]"
-
+        output = _truncate_with_references(output, max_per_result)
         entry = f"  - {step}: {output}" if step else f"  - {output}"
         formatted.append(entry)
 
@@ -43,8 +75,6 @@ def compress_context(
     if len(full_text) <= max_total_chars:
         return full_text
 
-    # Still too long even after per-result capping -- drop oldest entries
-    # first, keeping the most recent ones intact, until it fits.
     dropped = 0
     kept = list(formatted)
     while kept and len(f"{header}\n" + "\n".join(kept)) > max_total_chars:

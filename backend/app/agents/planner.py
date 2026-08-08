@@ -8,6 +8,42 @@ from app.tools.registry import ToolRegistry
 from app.agents.verifier import Verifier
 from app.core.llm_json import parse_llm_json
 
+MAX_COST_PER_TASK = 2.0
+
+
+def _estimate_cost(response: Any) -> float:
+    try:
+        usage = getattr(response, "usage_metadata", None)
+        if not usage:
+            return 0.0
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        return (input_tokens / 1_000_000) * 0.95 + (output_tokens / 1_000_000) * 4.00
+    except Exception:
+        return 0.0
+
+
+def _accumulate_cost(state: dict, added_cost: float) -> None:
+    metrics = state.get("cost_metrics", {}) or {}
+    metrics["total_cost_usd"] = float(metrics.get("total_cost_usd", 0) or 0) + added_cost
+    state["cost_metrics"] = metrics
+
+
+def _check_cost_ceiling(state: dict) -> bool:
+    metrics = state.get("cost_metrics", {}) or {}
+    total = float(metrics.get("total_cost_usd", 0) or 0)
+    if total > MAX_COST_PER_TASK:
+        state["done"] = True
+        state["status"] = "completed"
+        state["final_answer"] = (
+            f"Task stopped because the cost limit of ${MAX_COST_PER_TASK:.2f} "
+            f"was reached (current total: ${total:.4f}). "
+            "Here is what was gathered so far."
+        )
+        return True
+    return False
+
+
 logger = structlog.get_logger("aether.agents.planner")
 
 class Planner:
@@ -46,7 +82,7 @@ class Planner:
                 or state.get("verification")
                 or {}
             )
-            plan = await self.replan(overall_goal, context, feedback, image_data)
+            plan = await self.replan(overall_goal, context, feedback, image_data, state=state)
             if self.replan_count >= self.max_replans:
                 state["done"] = True
                 state["status"] = "completed"
@@ -54,7 +90,11 @@ class Planner:
                     state["final_answer"] = await self._synthesize_fallback_answer(state)
         else:
             self.replan_count = 0
-            plan = await self.generate_plan(overall_goal, context, image_data, user_id, thread_id)
+            plan = await self.generate_plan(overall_goal, context, image_data, user_id, thread_id, state=state)
+
+        if _check_cost_ceiling(state):
+            return state
+
         # Update state
         state["plan"] = plan
         state["current_step"] = 0
@@ -76,7 +116,8 @@ class Planner:
         context: str,
         image_data: Optional[str] = None,
         user_id: str = "anonymous",
-        thread_id: str = "default"
+        thread_id: str = "default",
+        state: Optional[dict] = None,
     ) -> List[Dict[str, Any]]:
         # Route to domain
         route_result = await self.domain_router.route(overall_goal, user_id, thread_id)
@@ -116,12 +157,16 @@ class Planner:
             plan = parse_llm_json(response.content)
             self.current_plan = plan
             logger.info("planner.initial_plan_generated", num_steps=len(plan), domain=domain)
+            if state:
+                cost = _estimate_cost(response)
+                if cost:
+                    _accumulate_cost(state, cost)
             return plan
         except Exception as e:
             logger.error("planner.initial_plan_failed", error=str(e), exc_info=True)
             return []
 
-    async def replan(self, overall_goal: str, context: str, feedback: Dict[str, Any], image_data: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def replan(self, overall_goal: str, context: str, feedback: Dict[str, Any], image_data: Optional[str] = None, state: Optional[dict] = None) -> List[Dict[str, Any]]:
         if self.replan_count >= self.max_replans:
             logger.warning("planner.max_replans_reached", replan_count=self.replan_count)
             return self.current_plan
@@ -135,6 +180,7 @@ class Planner:
             "Each step should be a JSON object with 'step_id', 'description', 'tool_name', "
             "and 'tool_args' (a dictionary). If no tool is needed, set 'tool_name' to null. "
             "Consider the provided context, visual information, and especially the feedback."
+            "\n\n"
             "Respond with a JSON array of revised step objects."
             f"Available tools (with their exact required parameters — use these exact "
             f"argument names in tool_args, do not invent your own): "
@@ -162,6 +208,10 @@ class Planner:
             revised_plan = parse_llm_json(response.content)
             self.current_plan = revised_plan
             logger.info("planner.revised_plan_generated", num_steps=len(revised_plan), replan_count=self.replan_count)
+            if state:
+                cost = _estimate_cost(response)
+                if cost:
+                    _accumulate_cost(state, cost)
             return revised_plan
         except Exception as e:
             logger.error("planner.replan_failed", error=str(e), exc_info=True)

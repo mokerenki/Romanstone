@@ -52,6 +52,12 @@ services:
       - ./backend:/workspace
     networks:
       - aether_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   backend:
     build:
@@ -96,12 +102,6 @@ services:
       # CORS is same-origin through nginx now, but keep this set in case
       # something calls the backend directly (e.g. server-to-server, tests).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      MCP_SERVERS: >
-        {
-          "filesystem": {
-            "url": "http://mcp-filesystem:3000/sse"
-          }
-        }
     depends_on:
       postgres:
         condition: service_healthy

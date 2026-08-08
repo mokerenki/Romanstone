@@ -57,7 +57,7 @@ class ProactiveTaskWorker:
         self.checkpointer: Optional[RedisCheckpointer] = None
 
         # Initialize domain router
-        self.mcp_registry = MCPRegistry(self.cognee_memory)
+        self.mcp_registry = MCPRegistry()
         self.domain_router = DomainRouter(self.model_router, self.mcp_registry)
 
         logger.info("proactive_task_worker.initialized", consumer_name=self.consumer_name, redis_url=redis_url)
