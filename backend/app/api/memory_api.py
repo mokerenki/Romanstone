@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.core.context import synthai
+
 logger = structlog.get_logger("aether.api.memory")
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
-# This will be set during lifespan startup in main.py
-cognee_memory = None
 
 @router.post("/search")
 async def search_memory(request: Dict[str, Any]):
@@ -26,7 +26,9 @@ async def search_memory(request: Dict[str, Any]):
         "top_k": "integer (optional, default 5 for semantic)"
     }
     """
-    if cognee_memory is None:
+    synthai.ensure_initialized()
+    
+    if synthai.cognee_memory is None:
         logger.error("memory_api.cognee_memory_not_initialized")
         raise HTTPException(status_code=500, detail="Memory service not initialized")
 
@@ -58,7 +60,7 @@ async def search_memory(request: Dict[str, Any]):
                 query_time = datetime.fromisoformat(query_time.replace("Z", "+00:00"))
             kwargs["query_time"] = query_time
         
-        result = await cognee_memory.search(**kwargs)
+        result = await synthai.cognee_memory.search(**kwargs)
         
         logger.info("memory_api.search_completed", mode=mode, result_count=len(result.get("results", [])))
         return result
@@ -75,11 +77,13 @@ async def search_memory(request: Dict[str, Any]):
 @router.get("/health")
 async def memory_health():
     """Health check for the memory service."""
-    if cognee_memory is None:
+    synthai.ensure_initialized()
+    
+    if synthai.cognee_memory is None:
         return JSONResponse(status_code=503, content={"status": "unavailable", "message": "Memory service not initialized"})
     
     try:
-        if not cognee_memory._initialized:
+        if not synthai.cognee_memory._initialized:
             return JSONResponse(status_code=503, content={"status": "initializing", "message": "Memory service is initializing"})
         
         return {"status": "healthy", "message": "Memory service is operational"}
@@ -98,7 +102,9 @@ async def graph_query(request: Dict[str, Any]):
         "query": "MATCH (n) RETURN n LIMIT 10"
     }
     """
-    if cognee_memory is None:
+    synthai.ensure_initialized()
+    
+    if synthai.cognee_memory is None:
         logger.error("memory_api.cognee_memory_not_initialized")
         raise HTTPException(status_code=500, detail="Memory service not initialized")
 
@@ -109,7 +115,7 @@ async def graph_query(request: Dict[str, Any]):
     try:
         logger.info("memory_api.graph_query_initiated", query=query[:50])
         
-        result = await cognee_memory.search(query=query, mode="graph")
+        result = await synthai.cognee_memory.search(query=query, mode="graph")
         
         logger.info("memory_api.graph_query_completed", result_count=len(result.get("results", [])))
         return result
@@ -131,7 +137,9 @@ async def ingest_event(request: Dict[str, Any]):
         "event_id": "string (optional, auto-generated if not provided)"
     }
     """
-    if cognee_memory is None:
+    synthai.ensure_initialized()
+    
+    if synthai.cognee_memory is None:
         logger.error("memory_api.cognee_memory_not_initialized")
         raise HTTPException(status_code=500, detail="Memory service not initialized")
 
@@ -148,7 +156,7 @@ async def ingest_event(request: Dict[str, Any]):
     try:
         logger.info("memory_api.ingestion_initiated", source=event["source"])
         
-        await cognee_memory.ingest(event)
+        await synthai.cognee_memory.ingest(event)
         
         logger.info("memory_api.ingestion_completed", event_id=event.get("event_id"))
         return {"status": "success", "message": "Event ingested successfully", "event_id": event.get("event_id")}
@@ -163,22 +171,26 @@ async def memory_stats():
     """
     Get statistics about the memory system.
     """
-    if cognee_memory is None:
+    synthai.ensure_initialized()
+    
+    if synthai.cognee_memory is None:
         logger.error("memory_api.cognee_memory_not_initialized")
         raise HTTPException(status_code=500, detail="Memory service not initialized")
 
     try:
         stats = {
-            "initialized": cognee_memory._initialized,
-            "qdrant_collection": cognee_memory.qdrant_collection_name if cognee_memory.qdrant_client else None,
-            "embedding_model": cognee_memory.embedding_model_name,
-            "llm_extraction_model": cognee_memory.llm_extraction_model_name,
+            "initialized": synthai.cognee_memory._initialized,
+            "qdrant_collection": synthai.cognee_memory.qdrant_collection_name if synthai.cognee_memory.qdrant_client else None,
+            "embedding_model": synthai.cognee_memory.embedding_model_name,
+            "llm_extraction_model": synthai.cognee_memory.llm_extraction_model_name,
         }
         
         # Try to get collection info from Qdrant if available
-        if cognee_memory.qdrant_client and cognee_memory._initialized:
+        if synthai.cognee_memory.qdrant_client and synthai.cognee_memory._initialized:
             try:
-                collection_info = cognee_memory.qdrant_client.get_collection(cognee_memory.qdrant_collection_name)
+                collection_info = synthai.cognee_memory.qdrant_client.get_collection(
+                    synthai.cognee_memory.qdrant_collection_name
+                )
                 stats["qdrant_points_count"] = collection_info.points_count
             except Exception as e:
                 logger.warning("memory_api.qdrant_stats_unavailable", error=str(e))

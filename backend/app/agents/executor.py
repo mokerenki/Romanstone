@@ -233,7 +233,7 @@ Context from previous steps:
 
 Rules:
 * Be factual and direct.
-* If the answer is a simple fact, state it plainly.
+* If the answer is a simple fact, state it plainl like a human would.
 * Base your answer strictly on the information in "Context from previous steps" -- do not fill gaps with your own general knowledge, and do not guess.
 * If the context does not contain enough information to answer confidently, say so plainly in one sentence rather than guessing.
 * If the context contains conflicting information, prefer the most recent or most authoritative source and answer with that.

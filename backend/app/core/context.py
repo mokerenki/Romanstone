@@ -101,3 +101,5 @@ class SynthAIContext:
 
 # Global singleton - import this everywhere
 synthai = SynthAIContext()
+
+__all__ = ["synthai", "SynthAIContext"]

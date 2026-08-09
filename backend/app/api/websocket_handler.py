@@ -22,7 +22,7 @@ from app.core import instances
 from app.core.exceptions import ToolConfirmationRequired
 from app.core.errors import TaskErrorCode, to_user_error
 from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
-from app.api.tasks import persist_task_progress
+from app.core.persistence import persist_task_progress
 
 logger = structlog.get_logger("aether.websocket_handler")
 

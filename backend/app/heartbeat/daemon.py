@@ -8,7 +8,8 @@ import structlog
 
 from app.heartbeat.probes import HTTPProbe, FileProbe, ProcessProbe, QueueProbe, BaseProbe
 from app.heartbeat.policy_engine import PolicyEngine
-from app.api.tasks import create_proactive_task_to_queue # Renamed for clarity
+from app.api.tasks import create_proactive_task_to_queue
+from app.core.context import synthai
 
 logger = structlog.get_logger("aether.heartbeat.daemon")
 
@@ -70,7 +71,7 @@ class HeartbeatDaemon:
             probe_type = probe_cfg.get("type")
             try:
                 if probe_type == "http":
-                    new_probes[probe_name] = HTTPProbe(probe_cfg )
+                    new_probes[probe_name] = HTTPProbe(probe_cfg)
                 elif probe_type == "file":
                     new_probes[probe_name] = FileProbe(probe_cfg)
                 elif probe_type == "process":

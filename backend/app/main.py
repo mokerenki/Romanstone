@@ -63,7 +63,6 @@ async def lifespan(app: FastAPI):
         namespace="aether",
         ttl_hours=24,
     )
-    tasks_router.checkpointer = app.state.checkpointer
     logger.info("checkpointer.initialized", type="redis")
 
     # Initialize Cognee Memory (with Redis embedding cache)

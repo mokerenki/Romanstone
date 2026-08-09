@@ -1,18 +1,18 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any, List
-from app.heartbeat.daemon import heartbeat_daemon  
 import yaml
 import os
 import structlog
 
-# Import the heartbeat daemon instance to trigger config reload
 from app.heartbeat.daemon import heartbeat_daemon
+from app.core.context import synthai
 
 logger = structlog.get_logger("aether.api.heartbeat_config")
 router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(BASE_DIR, "heartbeat", "config.yaml")
+
 
 @router.get("/heartbeat/config", response_model=Dict[str, Any])
 async def get_heartbeat_config() -> Dict[str, Any]:
@@ -30,6 +30,7 @@ async def get_heartbeat_config() -> Dict[str, Any]:
     except Exception as e:
         logger.error("heartbeat_config.get", status="error", error=str(e), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unexpected error reading configuration: {str(e)}")
+
 
 @router.post("/heartbeat/config", response_model=Dict[str, Any])
 async def update_heartbeat_config(new_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -59,6 +60,7 @@ async def update_heartbeat_config(new_config: Dict[str, Any]) -> Dict[str, Any]:
         logger.error("heartbeat_config.update", status="error", error=str(e), exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error updating configuration: {str(e)}")
 
+
 @router.get("/heartbeat/status", response_model=Dict[str, Any])
 async def get_heartbeat_status() -> Dict[str, Any]:
     """Retrieves the current operational status of the heartbeat daemon and its probes."""
@@ -69,7 +71,6 @@ async def get_heartbeat_status() -> Dict[str, Any]:
         "probes_configured_count": len(heartbeat_daemon.probes),
         "last_probe_runs": {name: ts.isoformat() for name, ts in heartbeat_daemon.last_probe_run.items()},
         "config_last_loaded": heartbeat_daemon.config.get("last_loaded_at", "N/A"),
-        # Potentially add more detailed probe results or recent alerts
     }
     logger.info("heartbeat_config.status_retrieved")
     return status_info

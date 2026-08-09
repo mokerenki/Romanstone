@@ -3,7 +3,58 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: #0a0a16;
+    --surface: #12121f;
+    --surface-light: #1a1a2e;
+    --surface-hover: #24243a;
+    --border: #2a2a42;
+    --text-primary: #f0f0ff;
+    --text-secondary: #9090b0;
+    --text-muted: #606080;
+    
+    /* Brand Colors - SynthAI */
+    --brand-primary: #6366f1;
+    --brand-primary-dark: #4f46e5;
+    --brand-primary-light: #818cf8;
+    --brand-secondary: #8b5cf6;
+    --brand-accent: #d946ef;
+    --brand-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #d946ef);
+    
+    /* Status Colors */
+    --status-success: #22c55e;
+    --status-warning: #eab308;
+    --status-error: #ef4444;
+    --status-info: #3b82f6;
+  }
+  
+  * {
+    border-color: var(--border);
+  }
+  
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply bg-[#0a0a16] text-[#f0f0ff] antialiased;
+  }
+}
+
+@layer components {
+  /* Gradient text utility */
+  .text-gradient {
+    @apply bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent;
+  }
+  
+  /* Glass effect */
+  .glass {
+    @apply bg-gray-900/30 backdrop-blur-sm border border-gray-800/50;
+  }
+  
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200 hover:border-gray-600 hover:bg-gray-800/50;
+  }
+  
+  /* Gradient button */
+  .btn-gradient {
+    @apply bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold transition-all duration-200;
   }
 }
