@@ -212,7 +212,7 @@ export default function Sidebar({
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-text-primary">Victor Lefoka</p>
-              <p className="text-xs text-text-muted">Free plan</p>
+              <p className="text-xs text-text-muted">Beta</p>
             </div>
           )}
         </div>

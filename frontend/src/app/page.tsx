@@ -32,10 +32,10 @@ export default function Home() {
           <span className="text-sm font-medium text-text-secondary">synthAI Agent</span>
           <div className="flex items-center gap-3 text-xs">
             <span className="rounded-full bg-synthai-surface-light px-3 py-1 text-text-secondary">
-              Free plan
+              test beta
             </span>
             <button className="font-medium text-brand-400 transition-colors hover:text-brand-300">
-              Upgrade
+              signup
             </button>
           </div>
         </header>

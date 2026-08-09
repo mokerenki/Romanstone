@@ -8,12 +8,18 @@ import {
   Code, 
   TrendingUp,
   Search,
+  FileSpreadsheet,
   Presentation,
   Mail,
   Users,
   Building2,
   BarChart3,
-  Shield
+  Shield,
+  Sparkles,
+  Video,
+  MessageSquare,
+  LineChart,
+  Send
 } from 'lucide-react';
 
 interface QuickAction {
@@ -29,14 +35,14 @@ interface QuickActionsProps {
 
 export default function QuickActions({ onAction, onMore }: QuickActionsProps) {
   const actions: QuickAction[] = [
-    { icon: <Presentation className="w-4 h-4" />, label: 'Create slides', action: 'create_slides' },
-    { icon: <Globe className="w-4 h-4" />, label: 'Build website', action: 'build_website' },
-    { icon: <Code className="w-4 h-4" />, label: 'Design', action: 'design' },
-    { icon: <FileText className="w-4 h-4" />, label: 'Write document', action: 'document' },
-    { icon: <Search className="w-4 h-4" />, label: 'Research', action: 'research' },
-    { icon: <Mail className="w-4 h-4" />, label: 'Draft email', action: 'draft_email' },
-    { icon: <Users className="w-4 h-4" />, label: 'Sales outreach', action: 'sales_outreach' },
-    { icon: <BarChart3 className="w-4 h-4" />, label: 'Financial analysis', action: 'financial_analysis' },
+    { icon: <TrendingUp className="w-4 h-4" />, label: 'Find TikTok hook', action: 'find_tiktok_hook' },
+    { icon: <Sparkles className="w-4 h-4" />, label: 'Generate viral angle', action: 'generate_viral_angle' },
+    { icon: <Video className="w-4 h-4" />, label: 'Draft video script', action: 'draft_video_script' },
+    { icon: <Search className="w-4 h-4" />, label: 'Analyze competitor ads', action: 'analyze_competitor_ads' },
+    { icon: <MessageSquare className="w-4 h-4" />, label: 'Craft high-intent DM', action: 'craft_outreach_dm' },
+    { icon: <LineChart className="w-4 h-4" />, label: 'Audit social engagement', action: 'audit_social_engagement' },
+    { icon: <FileSpreadsheet className="w-4 h-4" />, label: 'Build campaign brief', action: 'build_campaign_brief' },
+    { icon: <Send className="w-4 h-4" />, label: 'Schedule post batch', action: 'schedule_posts' },
   ];
 
   return (
