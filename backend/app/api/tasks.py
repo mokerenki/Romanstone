@@ -69,8 +69,8 @@ async def _set_task_metadata(task_id: str, metadata: Dict[str, Any]) -> None:
     await ctx.redis_client.expire(key, TASK_TTL_SECONDS)
 
 
-async def _persist_task_progress(thread_id: str, state: Dict[str, Any]) -> None:
-    """Persist incremental task progress."""
+async def persist_task_progress(thread_id: str, state: Dict[str, Any]) -> None:
+    """Persist incremental task progress to Redis."""
     ctx = _get_context()
     key = f"{TASK_PROGRESS_PREFIX}:{thread_id}"
     payload = {
@@ -86,6 +86,28 @@ async def _persist_task_progress(thread_id: str, state: Dict[str, Any]) -> None:
     }
     await ctx.redis_client.hset(key, mapping=payload)
     await ctx.redis_client.expire(key, TASK_TTL_SECONDS)
+
+
+async def get_task_progress(thread_id: str) -> Optional[Dict[str, Any]]:
+    """Get task progress from Redis."""
+    ctx = _get_context()
+    key = f"{TASK_PROGRESS_PREFIX}:{thread_id}"
+    data = await ctx.redis_client.hgetall(key)
+    if not data:
+        return None
+    result = {
+        k.decode() if isinstance(k, bytes) else k: 
+        v.decode() if isinstance(v, bytes) else v 
+        for k, v in data.items()
+    }
+    for field in ("plan", "results", "cost_metrics"):
+        val = result.get(field)
+        if val:
+            try:
+                result[field] = json.loads(val)
+            except Exception:
+                pass
+    return result
 
 
 # ─── Endpoints ────────────────────────────────────────────
@@ -311,7 +333,7 @@ async def _execute_task(
         async for event in graph.astream(initial_state, config=config):
             event_type = list(event.keys())[0]
             node_output = event[event_type]
-            await _persist_task_progress(thread_id, node_output)
+            await persist_task_progress(thread_id, node_output)
         
         snapshot = await graph.aget_state(config)
         final_state = snapshot.values if snapshot else initial_state
@@ -365,7 +387,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             action = data.get("action")
             
             if action == "run_task":
-                user_message = data.get("message", "")
+                user_message = data.get("message", "").strip()
+                
+                # Validate message
+                if not user_message:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Please enter a message before running a task.",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    continue
+                
                 user_id = data.get("user_id", "anonymous")
                 tenant_id = data.get("tenant_id", "default")
                 thread_id = data.get("thread_id") or str(uuid.uuid4())

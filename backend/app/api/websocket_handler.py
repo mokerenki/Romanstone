@@ -6,7 +6,7 @@ import traceback
 
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
-from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
+from langchain_core.messages import HumanMessage
 
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.memory.cognee_setup import CogneeMemory
@@ -22,8 +22,10 @@ from app.core import instances
 from app.core.exceptions import ToolConfirmationRequired
 from app.core.errors import TaskErrorCode, to_user_error
 from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
+from app.api.tasks import persist_task_progress
 
 logger = structlog.get_logger("aether.websocket_handler")
+
 
 async def stream_task_events(
     user_message: str,
@@ -50,6 +52,7 @@ async def stream_task_events(
         tool_registry: Registry of available tools (uses global if None).
         domain_router: Router for domain classification (uses global if None).
         browser_service: Browser automation service (optional).
+        extra_state: Additional state to merge into initial state.
     """
     task_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
@@ -103,6 +106,8 @@ async def stream_task_events(
         },
         "planning_iterations": 0,
         "scratchpad": "",
+        "confirmed_tools": {},
+        "skipped_steps": {},
     }
     if extra_state:
         initial_state.update(extra_state)
@@ -121,20 +126,32 @@ async def stream_task_events(
             node_output = event[event_type]
 
             if event_type == "planner":
-                yield {"type": "planner_output", "content": node_output.get("plan"), "timestamp": datetime.now(timezone.utc).isoformat()}
-                from app.api.tasks import persist_task_progress
+                yield {
+                    "type": "planner_output", 
+                    "content": node_output.get("plan"), 
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
                 await persist_task_progress(thread_id, node_output)
+                
             elif event_type == "executor":
                 results = node_output.get("results", [])
                 if results:
                     last_result = results[-1]
-                    yield {"type": "executor_output", "content": last_result, "timestamp": datetime.now(timezone.utc).isoformat()}
-                from app.api.tasks import persist_task_progress
+                    yield {
+                        "type": "executor_output", 
+                        "content": last_result, 
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
                 await persist_task_progress(thread_id, node_output)
+                
             elif event_type == "verifier":
-                yield {"type": "verifier_output", "content": node_output.get("verification"), "timestamp": datetime.now(timezone.utc).isoformat()}
-                from app.api.tasks import persist_task_progress
+                yield {
+                    "type": "verifier_output", 
+                    "content": node_output.get("verification"), 
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
                 await persist_task_progress(thread_id, node_output)
+                
             else:
                 logger.debug("unknown_graph_event", event_type=event_type)
 
@@ -167,12 +184,13 @@ async def stream_task_events(
         }
 
     except Exception as exc:
-        code, user_message = to_user_error(exc)
+        code, user_message_error = to_user_error(exc)
         logger.exception("websocket_task_execution_failed", error_code=code, error=str(exc))
         yield {
             "type": "task_error",
             "error_code": code,
-            "message": user_message,
+            "message": user_message_error,
+            "error": str(exc),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     finally:
@@ -190,6 +208,7 @@ async def websocket_endpoint(
     tool_registry: ToolRegistry,
     domain_router: DomainRouter,
 ):
+    """WebSocket endpoint for real-time task streaming."""
     await websocket.accept()
     client_id = str(uuid.uuid4())
     logger.info("websocket.connected", client_id=client_id)
@@ -198,8 +217,20 @@ async def websocket_endpoint(
         while True:
             data = await websocket.receive_json()
             action = data.get("action")
+            logger.debug("websocket.received", client_id=client_id, action=action)
+            
             if action == "run_task":
-                user_message = data.get("message", "")
+                user_message = data.get("message", "").strip()
+                
+                # Validate message
+                if not user_message:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Please enter a message before running a task.",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    continue
+                
                 user_id = data.get("user_id", "anonymous")
                 tenant_id = data.get("tenant_id", "default")
                 thread_id = data.get("thread_id") or str(uuid.uuid4())
@@ -216,13 +247,19 @@ async def websocket_endpoint(
                     browser_service,
                 ):
                     await websocket.send_json(event)
+                    
             elif action == "confirm_tool":
                 thread_id = data.get("thread_id")
                 tool_name = data.get("tool_name")
                 step_index = data.get("step_index")
                 if not thread_id or not tool_name:
-                    await websocket.send_json({"type": "error", "message": "thread_id and tool_name are required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    await websocket.send_json({
+                        "type": "error", 
+                        "message": "thread_id and tool_name are required", 
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                     continue
+                    
                 async for event in stream_task_events(
                     data.get("message", ""),
                     data.get("user_id", "anonymous"),
@@ -236,12 +273,18 @@ async def websocket_endpoint(
                     extra_state={"confirmed_tools": {tool_name: True}},
                 ):
                     await websocket.send_json(event)
+                    
             elif action == "reject_tool":
                 thread_id = data.get("thread_id")
                 step_index = data.get("step_index")
                 if not thread_id or step_index is None:
-                    await websocket.send_json({"type": "error", "message": "thread_id and step_index are required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    await websocket.send_json({
+                        "type": "error", 
+                        "message": "thread_id and step_index are required", 
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                     continue
+                    
                 async for event in stream_task_events(
                     data.get("message", ""),
                     data.get("user_id", "anonymous"),
@@ -255,11 +298,17 @@ async def websocket_endpoint(
                     extra_state={"skipped_steps": {step_index: True}},
                 ):
                     await websocket.send_json(event)
+                    
             elif action == "resume_task":
                 thread_id = data.get("thread_id")
                 if not thread_id:
-                    await websocket.send_json({"type": "error", "message": "thread_id is required", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    await websocket.send_json({
+                        "type": "error", 
+                        "message": "thread_id is required", 
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                     continue
+                    
                 async for event in stream_task_events(
                     data.get("message", ""),
                     data.get("user_id", "anonymous"),
@@ -272,16 +321,19 @@ async def websocket_endpoint(
                     browser_service,
                 ):
                     await websocket.send_json(event)
+                    
             elif action == "ping":
-                await websocket.send_json({"type": "pong"})
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                
     except WebSocketDisconnect:
         logger.info("websocket.disconnected", client_id=client_id)
     except Exception as exc:
-        code, user_message = to_user_error(exc)
+        code, user_message_error = to_user_error(exc)
         logger.exception("websocket.error", client_id=client_id, error_code=code, error=str(exc))
         await websocket.send_json({
             "type": "error",
             "error_code": code,
-            "message": user_message,
+            "message": user_message_error,
+            "error": str(exc),
             "timestamp": datetime.now(timezone.utc).isoformat()
         })

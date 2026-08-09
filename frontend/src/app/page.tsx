@@ -49,6 +49,16 @@ export default function Home() {
   const wsRef = useRef<WebSocket | null>(null);
   const eventLogRef = useRef<HTMLDivElement>(null);
   const reconnectAttemptRef = useRef(0);
+  const statusRef = useRef(currentStatus);
+  const taskRef = useRef(task);
+
+  useEffect(() => {
+    statusRef.current = currentStatus;
+  }, [currentStatus]);
+
+  useEffect(() => {
+    taskRef.current = task;
+  }, [task]);
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -61,7 +71,12 @@ export default function Home() {
       reconnectAttemptRef.current = 0;
 
       const savedThreadId = localStorage.getItem(THREAD_ID_KEY);
-      if (savedThreadId && currentStatus !== "idle") {
+      if (
+        savedThreadId &&
+        statusRef.current !== "idle" &&
+        statusRef.current !== "completed" &&
+        statusRef.current !== "failed"
+      ) {
         ws.send(
           JSON.stringify({
             action: "resume_task",
@@ -117,9 +132,6 @@ export default function Home() {
         reason: event.reason,
         wasClean: event.wasClean,
       });
-      if (loading) {
-        setCurrentStatus("disconnected");
-      }
       const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30000);
       setTimeout(connectWebSocket, delay);
       reconnectAttemptRef.current += 1;
@@ -132,7 +144,7 @@ export default function Home() {
     };
 
     wsRef.current = ws;
-  }, [loading, currentStatus]);
+  }, []);
 
   useEffect(() => {
     connectWebSocket();
@@ -148,7 +160,8 @@ export default function Home() {
   }, [events]);
 
   const submitTask = useCallback(() => {
-    if (!task.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    const currentTask = taskRef.current;
+    if (!currentTask.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn("WebSocket not open or task is empty.");
       return;
     }
@@ -164,13 +177,13 @@ export default function Home() {
     wsRef.current.send(
       JSON.stringify({
         action: "run_task",
-        message: task,
+        message: currentTask,
         user_id: "dashboard",
         tenant_id: "default",
         thread_id: threadId,
       })
     );
-  }, [task]);
+  }, []);
 
   const confirmTool = useCallback(() => {
     if (!pendingConfirmation || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -181,14 +194,14 @@ export default function Home() {
         thread_id: pendingConfirmation.thread_id,
         tool_name: pendingConfirmation.tool_name,
         step_index: pendingConfirmation.step_index,
-        message: task,
+        message: taskRef.current,
         user_id: "dashboard",
         tenant_id: "default",
       })
     );
     setPendingConfirmation(null);
     setLoading(true);
-  }, [pendingConfirmation, task]);
+  }, [pendingConfirmation]);
 
   const rejectTool = useCallback(() => {
     if (!pendingConfirmation || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -198,24 +211,24 @@ export default function Home() {
         task_id: pendingConfirmation.task_id,
         thread_id: pendingConfirmation.thread_id,
         step_index: pendingConfirmation.step_index,
-        message: task,
+        message: taskRef.current,
         user_id: "dashboard",
         tenant_id: "default",
       })
     );
     setPendingConfirmation(null);
     setLoading(true);
-  }, [pendingConfirmation, task]);
+  }, [pendingConfirmation]);
 
   return (
     <main className="max-w-4xl mx-auto p-8">
-      <h1 className="text-4xl font-bold mb-2">Romanstone</h1>
-      <p className="text-gray-400 mb-8">Autonomous Agent Platform · Phase 0</p>
+      <h1 className="text-4xl font-bold mb-2">synthAI</h1>
+      <p className="text-gray-400 mb-8">Autonomous Agent Platform · Phase3</p>
 
       <div className="flex gap-4 mb-8">
         <input
           className="flex-1 p-3 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter a task (e.g., 'Who is the president of South Africa?')"
+          placeholder="Enter a task (e.g., 'what time is it now in the USA')"
           value={task}
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submitTask()}
@@ -280,45 +293,45 @@ export default function Home() {
 
           <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 max-h-96 overflow-y-auto" ref={eventLogRef}>
             <h3 className="text-lg font-semibold mb-2 text-white">Event Log</h3>
-              {events.map((event, index) => (
-                <div key={index} className="text-gray-200 text-sm mb-1">
-                  <span className="text-gray-500">[{new Date(event.timestamp || Date.now()).toLocaleTimeString()}]</span>
-                  <span className="font-semibold ml-2">{event.type}:</span>
-                  {event.type === "planner_output" && (
-                    <pre className="whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
-                      {JSON.stringify(event.content, null, 2)}
-                    </pre>
-                  )}
-                  {event.type === "executor_output" && (
-                    <div className="ml-4">
-                      <p><strong>Step:</strong> {event.content.step}</p>
-                      {event.content.tool && <p><strong>Tool:</strong> {event.content.tool}</p>}
-                      <p><strong>Output:</strong> <span className="whitespace-pre-wrap">{event.content.output}</span></p>
-                    </div>
-                  )}
-                  {event.type === "verifier_output" && (
-                    <p className="ml-4 whitespace-pre-wrap">{JSON.stringify(event.content, null, 2)}</p>
-                  )}
-                  {event.type === "task_error" && (
-                    <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
-                      {event.error}\n{event.trace?.join("\n")}
-                    </pre>
-                  )}
-                  {event.type === "error" && (
-                    <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
-                      {event.message || event.error || "Unknown error"}
-                    </pre>
-                  )}
-                  {(event.type === "task_start" || event.type === "task_complete") && (
-                    <span className="ml-2 whitespace-pre-wrap">{event.message || event.status}</span>
-                  )}
-                  {event.type === "raw_graph_event" && (
-                    <pre className="whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
-                      {JSON.stringify(event.content, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              ))}
+            {events.map((event, index) => (
+              <div key={index} className="text-gray-200 text-sm mb-1">
+                <span className="text-gray-500">[{new Date(event.timestamp || Date.now()).toLocaleTimeString()}]</span>
+                <span className="font-semibold ml-2">{event.type}:</span>
+                {event.type === "planner_output" && (
+                  <pre className="whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
+                    {JSON.stringify(event.content, null, 2)}
+                  </pre>
+                )}
+                {event.type === "executor_output" && (
+                  <div className="ml-4">
+                    <p><strong>Step:</strong> {event.content.step}</p>
+                    {event.content.tool && <p><strong>Tool:</strong> {event.content.tool}</p>}
+                    <p><strong>Output:</strong> <span className="whitespace-pre-wrap">{event.content.output}</span></p>
+                  </div>
+                )}
+                {event.type === "verifier_output" && (
+                  <p className="ml-4 whitespace-pre-wrap">{JSON.stringify(event.content, null, 2)}</p>
+                )}
+                {event.type === "task_error" && (
+                  <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
+                    {event.error}{event.trace ? `\n${event.trace.join("\n")}` : ""}
+                  </pre>
+                )}
+                {event.type === "error" && (
+                  <pre className="text-red-400 whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
+                    {event.message || event.error || "Unknown error"}
+                  </pre>
+                )}
+                {(event.type === "task_start" || event.type === "task_complete") && (
+                  <span className="ml-2 whitespace-pre-wrap">{event.message || event.status}</span>
+                )}
+                {event.type === "raw_graph_event" && (
+                  <pre className="whitespace-pre-wrap text-xs bg-gray-900 p-2 rounded mt-1">
+                    {JSON.stringify(event.content, null, 2)}
+                  </pre>
+                )}
+              </div>
+            ))}
           </div>
 
           {finalAnswer && (
