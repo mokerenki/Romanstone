@@ -8,6 +8,7 @@ from app.tools.calendar_tool import CalendarTool
 from app.tools.document_tool import DocumentTool
 from app.tools.slack_tool import SlackTool
 from typing import Optional
+from datetime import datetime, timezone
 
 from app.core import instances
 
@@ -20,7 +21,6 @@ from app.api.heartbeat_config import router as heartbeat_config_router
 from app.api.tasks import router as tasks_router
 from app.api.websocket_handler import websocket_endpoint
 from app.api.memory_api import router as memory_api_router
-import app.api.memory_api as memory_api
 from app.api.integrations import router as integrations_router
 from app.core.config import settings
 from app.core.proactive_scheduler import ProactiveScheduler
@@ -35,6 +35,7 @@ from app.tools.python_repl import PythonREPLTool
 from app.tools.whatsapp_tool import WhatsAppTool
 from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
+from app.core.context import synthai
 
 logger = structlog.get_logger("aether.main")
 
@@ -72,10 +73,9 @@ async def lifespan(app: FastAPI):
         "kuzu_db_path": os.getenv("KUZU_DB_PATH", "/tmp/aether/kuzu.db"),
         "embedding_model_name": os.getenv("OPENAI_EMBEDDING_MODEL", "nvidia/nv-embed-v1"),
         "llm_extraction_model_name": os.getenv("OPENAI_CHAT_MODEL", "meta/llama-3.3-70b-instruct"),
-        "redis_url": settings.redis_url,  # <-- NEW: for embedding cache
+        "redis_url": settings.redis_url,
     })
     await app.state.cognee_memory.initialize()
-    memory_api.cognee_memory = app.state.cognee_memory
     logger.info("cognee_memory.initialized")
 
     # Initialize Browser Automation Service
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry.register(CalendarTool())
     app.state.tool_registry.register(DocumentTool())
     app.state.tool_registry.register(SlackTool())
-    logger.info("builtin_tools.registered")
+    logger.info("builtin_tools.registered", count=len(app.state.tool_registry.list_tools()))
 
     app.state.mcp_registry = MCPRegistry()
     await app.state.mcp_registry.register_all_tools(app.state.tool_registry)
@@ -110,41 +110,53 @@ async def lifespan(app: FastAPI):
     app.state.proactive_scheduler = ProactiveScheduler(
         model_router=app.state.model_router,
         cognee_memory=app.state.cognee_memory,
-        redis_client=app.state.redis_client,  # <-- NEW: for persistent scheduling
+        redis_client=app.state.redis_client,
         briefing_time_str=os.getenv("MORNING_BRIEFING_TIME", "08:00")
     )
     asyncio.create_task(app.state.proactive_scheduler.start())
     logger.info("proactive_scheduler.started")
 
-    # Populate global instances so cross-module imports can access them
+    # ------------------- POPULATE GLOBAL CONTEXT -------------------
+    # THIS IS THE KEY CHANGE - one initialization to rule them all
+    synthai.initialize(
+        redis_client=app.state.redis_client,
+        model_router=app.state.model_router,
+        checkpointer=app.state.checkpointer,
+        cognee_memory=app.state.cognee_memory,
+        browser_service=app.state.browser_service,
+        tool_registry=app.state.tool_registry,
+        mcp_registry=app.state.mcp_registry,
+        domain_router=app.state.domain_router,
+        started_at=datetime.now(timezone.utc).isoformat(),
+    )
+    logger.info("synthai_context.initialized")
+
+    # Also update legacy instances for backward compatibility
     instances.tool_registry = app.state.tool_registry
     instances.mcp_registry = app.state.mcp_registry
     instances.domain_router = app.state.domain_router
     instances.model_router = app.state.model_router
     instances.checkpointer = app.state.checkpointer
+    instances.cognee_memory = app.state.cognee_memory
 
     yield
 
     # ------------------- CLEANUP -------------------
     logger.info("application.shutdown")
-    if app.state.proactive_scheduler:
+    
+    # Use synthai.close() for unified cleanup
+    await synthai.close()
+    
+    # Also clean up proactive scheduler separately (it's not in synthai)
+    if hasattr(app.state, 'proactive_scheduler'):
         await app.state.proactive_scheduler.stop()
         logger.info("proactive_scheduler.stopped")
-    if app.state.browser_service:
-        await app.state.browser_service.stop()
-        logger.info("browser_service.stopped")
-    if app.state.model_router:
-        await app.state.model_router.close()
-        logger.info("model_router.closed")
-    if app.state.redis_client:
-        await app.state.redis_client.close()
-        logger.info("redis_client.closed")
-    if app.state.cognee_memory:
-        await app.state.cognee_memory.close()
-        logger.info("cognee_memory.closed")
+    
     if hasattr(app.state, 'mcp_registry'):
         await app.state.mcp_registry.close_all()
         logger.info("mcp_registry.closed")
+    
+    logger.info("application.shutdown_complete")
 
 
 app = FastAPI(

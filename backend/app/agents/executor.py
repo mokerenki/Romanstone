@@ -49,6 +49,9 @@ class ExecutorNode:
         self.router = router
 
     async def __call__(self, state: dict) -> dict:
+        if state.get("done", False):
+            return state
+
         plan = state.get("plan", [])
         current_step = state.get("current_step", 0)
         results = state.get("results", [])

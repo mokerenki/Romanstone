@@ -58,6 +58,8 @@ class Verifier:
                 # Otherwise, replan
                 state["needs_replan"] = True
                 state["done"] = False
+                state["replan_feedback"] = verification.get("feedback", "Final answer verification failed.")
+                state["feedback"] = verification.get("feedback", "Final answer verification failed.")
             return state
 
         # If we have a plan but haven't executed it yet, verify the plan
@@ -66,6 +68,8 @@ class Verifier:
             state["verification"] = verification
             if verification.get("status") != "PASS":
                 state["needs_replan"] = True
+                state["replan_feedback"] = verification.get("feedback", "Plan verification failed.")
+                state["feedback"] = verification.get("feedback", "Plan verification failed.")
             return state
 
         # If we're in the middle of execution, verify the last step's output
@@ -80,6 +84,8 @@ class Verifier:
                 state["verification"] = verification
                 if verification.get("status") != "PASS":
                     state["needs_replan"] = True
+                    state["replan_feedback"] = verification.get("feedback", "Step verification failed.")
+                    state["feedback"] = verification.get("feedback", "Step verification failed.")
             else:
                 # All steps have been executed? But no final answer yet – maybe the plan is done.
                 # Let's check if we've executed all steps.

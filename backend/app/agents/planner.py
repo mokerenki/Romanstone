@@ -169,7 +169,12 @@ class Planner:
     async def replan(self, overall_goal: str, context: str, feedback: Dict[str, Any], image_data: Optional[str] = None, state: Optional[dict] = None) -> List[Dict[str, Any]]:
         if self.replan_count >= self.max_replans:
             logger.warning("planner.max_replans_reached", replan_count=self.replan_count)
-            return self.current_plan
+            if state:
+               state["done"] = True
+               state["status"] = "completed"
+               if not state.get("final_answer"):
+                   state["final_answer"] = await self._synthesize_fallback_answer(state)
+            return []
 
         self.replan_count += 1
         logger.info("planner.replanning", goal=overall_goal[:100], replan_count=self.replan_count)

@@ -44,13 +44,21 @@ def create_graph(
         return "executor"
 
     def should_loop(state):
-        # Verifier already correctly computes done/needs_replan -- it only
-        # sets done=True on a real final-answer PASS, and needs_replan=True
-        # on any FAIL. Trust those flags directly instead of re-deriving
-        # status here; re-deriving it is what caused the ordering bug
-        # where a FAIL branch returned before the iteration cap could ever
-        # be checked.
+        # Hard stop - always check first
         if state.get("done", False):
+            return END
+        
+        # Check if plan is empty (planner returned [] when max_replans reached)
+        if not state.get("plan") or len(state.get("plan", [])) == 0:
+            logger.warning("graph.empty_plan", state_keys=list(state.keys()))
+            state["done"] = True
+            state["status"] = "completed"
+            if not state.get("final_answer"):
+                results = state.get("results", [])
+                state["final_answer"] = (
+                    results[-1].get("output") if results
+                    else "The task could not be completed. Please try rephrasing your request."
+                )
             return END
 
         if state.get("planning_iterations", 0) >= MAX_PLANNING_ITERATIONS:

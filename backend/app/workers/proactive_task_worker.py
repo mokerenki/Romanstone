@@ -6,7 +6,7 @@ import uuid
 import os
 import traceback
 from typing import Any, Dict, Optional
-from langchain_core.messages import HumanMessage  # type: ignore[import-not-found]
+from langchain_core.messages import HumanMessage
 
 import redis.asyncio as aioredis
 
@@ -22,9 +22,11 @@ from app.tools.python_repl import PythonREPLTool
 from app.memory.retriever_tool import MemoryRetrieverTool
 from app.agents.router import DomainRouter
 from app.mcp_clients import MCPRegistry
+from app.core.context import synthai
 
 # Configure logging for the worker
 logger = structlog.get_logger("aether.worker.proactive_task")
+
 
 class ProactiveTaskWorker:
     """Consumes proactive tasks from a Redis Stream and dispatches them to the agent loop for execution."""
@@ -33,51 +35,41 @@ class ProactiveTaskWorker:
         self.redis_url = redis_url
         self.stream_name = stream_name
         self.consumer_group = consumer_group
-        self.consumer_name = f"worker_{uuid.uuid4().hex[:8]}" # Unique consumer name for this instance
+        self.consumer_name = f"worker_{uuid.uuid4().hex[:8]}"  # Unique consumer name for this instance
         self._running = False
         self.redis_client: Optional[aioredis.Redis] = None
-
-        # Initialize agent components (each worker instance gets its own)
-        self.model_router = KimiDeepSeekRouter()
-        self.tool_registry = ToolRegistry()
         
-        # Register core tools (ensure these are available to the worker)
-        self.tool_registry.register(BrowserTool())
-        self.tool_registry.register(PythonREPLTool())
-
-        # Initialize memory components for the worker
-        # Use the shared KuzuDB path when available.
-        kuzu_db_path = os.environ.get("KUZU_DB_PATH", "/tmp/aether/kuzu.db")
-        self.kuzu_graph = KuzuGraph(db_path=kuzu_db_path)
-        self.cognee_memory = CogneeMemory(config={"kuzu_db_path": kuzu_db_path})
-        self.tool_registry.register(MemoryRetrieverTool(self.cognee_memory))
-
-        # Redis client and checkpointer are created in start() once Redis is ready,
-        # because get_redis_client()/aioredis.from_url are async.
-        self.checkpointer: Optional[RedisCheckpointer] = None
-
-        # Initialize domain router
-        self.mcp_registry = MCPRegistry()
-        self.domain_router = DomainRouter(self.model_router, self.mcp_registry)
+        # These will be initialized from context in start()
+        self.model_router = None
+        self.tool_registry = None
+        self.checkpointer = None
+        self.domain_router = None
+        self.mcp_registry = None
+        self.cognee_memory = None
 
         logger.info("proactive_task_worker.initialized", consumer_name=self.consumer_name, redis_url=redis_url)
 
     async def start(self):
-        """Connects to Redis, initializes memory, and starts consuming tasks."""
+        """Connects to Redis, gets dependencies from context, and starts consuming tasks."""
         if self._running:
             logger.info("proactive_task_worker.already_running")
             return
 
         logger.info("proactive_task_worker.starting", consumer_name=self.consumer_name)
         self._running = True
-        self.redis_client = await aioredis.from_url(self.redis_url)
-
-        # Initialize Redis-backed checkpointer now that Redis is ready
-        self.checkpointer = RedisCheckpointer(self.redis_client)
         
-        # Initialize Kuzu and Cognee memory for this worker instance
-        self.kuzu_graph.initialize()
-        await self.cognee_memory.initialize()
+        # Use the shared context for all dependencies
+        synthai.ensure_initialized()
+        
+        self.model_router = synthai.model_router
+        self.tool_registry = synthai.tool_registry
+        self.checkpointer = synthai.checkpointer
+        self.domain_router = synthai.domain_router
+        self.mcp_registry = synthai.mcp_registry
+        self.cognee_memory = synthai.cognee_memory
+        
+        # Redis client is shared
+        self.redis_client = synthai.redis_client
 
         # Ensure the Redis Stream consumer group exists
         try:
@@ -86,7 +78,7 @@ class ProactiveTaskWorker:
         except aioredis.exceptions.ResponseError as e:
             if "BUSYGROUP" not in str(e):
                 logger.error("proactive_task_worker.xgroup_create_error", group=self.consumer_group, stream=self.stream_name, error=str(e), exc_info=True)
-                raise # Re-raise if it's not just a busy group error
+                raise
             logger.info("proactive_task_worker.consumer_group_exists", group=self.consumer_group)
 
         await self._listen_for_tasks()
@@ -96,6 +88,7 @@ class ProactiveTaskWorker:
         """Stops the worker and closes Redis connection."""
         logger.info("proactive_task_worker.stopping", consumer_name=self.consumer_name)
         self._running = False
+        # Don't close redis_client - it's shared
         logger.info("proactive_task_worker.stopped", consumer_name=self.consumer_name)
 
     async def _listen_for_tasks(self):
@@ -104,7 +97,7 @@ class ProactiveTaskWorker:
             try:
                 # Read tasks using consumer group. Block for a short period.
                 response = await self.redis_client.xreadgroup(
-                    self.consumer_group, self.consumer_name, {self.stream_name: ">"}, count=1, block=1000 # Block for 1 second
+                    self.consumer_group, self.consumer_name, {self.stream_name: ">"}, count=1, block=1000  # Block for 1 second
                 )
                 
                 if response:
@@ -123,7 +116,7 @@ class ProactiveTaskWorker:
                 break
             except Exception as e:
                 logger.error("proactive_task_worker.stream_read_error", consumer=self.consumer_name, error=str(e), exc_info=True)
-                await asyncio.sleep(5) # Wait before retrying to prevent tight loop on persistent errors
+                await asyncio.sleep(5)  # Wait before retrying to prevent tight loop on persistent errors
 
     async def process_task(self, task_payload: Dict[str, Any], message_id: bytes):
         """Processes a single proactive task using the agent loop and acknowledges it upon completion."""
@@ -138,8 +131,13 @@ class ProactiveTaskWorker:
 
         logger.info("proactive_task_worker.processing_task", task_id=task_id, task_description=task_description, consumer=self.consumer_name)
 
-        # Create the graph for this task execution
-        graph = create_graph(self.model_router, self.domain_router, self.tool_registry, self.checkpointer)
+        # Create the graph for this task execution using shared dependencies
+        graph = create_graph(
+            self.model_router, 
+            self.domain_router, 
+            self.tool_registry, 
+            self.checkpointer
+        )
 
         initial_state = {
             "task_id": task_id,
@@ -147,14 +145,23 @@ class ProactiveTaskWorker:
             "user_id": user_id,
             "tenant_id": tenant_id,
             "messages": [HumanMessage(content=f"{task_description}\n\nContext: {context}")],
-            "plan": [], "current_step": 0, "tool_calls": [],
-            "verification": None, "needs_replan": False, "final_answer": None,
-            "status": "pending", "cost_metrics": {
-                "kimi_input_tokens": 0, "kimi_output_tokens": 0,
-                "deepseek_input_tokens": 0, "deepseek_output_tokens": 0,
-                "total_cost_usd": 0.0, "tool_calls": 0,
+            "plan": [], 
+            "current_step": 0, 
+            "tool_calls": [],
+            "verification": None, 
+            "needs_replan": False, 
+            "final_answer": None,
+            "status": "pending", 
+            "cost_metrics": {
+                "kimi_input_tokens": 0, 
+                "kimi_output_tokens": 0,
+                "deepseek_input_tokens": 0, 
+                "deepseek_output_tokens": 0,
+                "total_cost_usd": 0.0, 
+                "tool_calls": 0,
             },
-            "planning_iterations": 0, "scratchpad": "",
+            "planning_iterations": 0, 
+            "scratchpad": "",
             "priority": priority,
             "action_type": action_type
         }
