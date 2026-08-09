@@ -1,398 +1,621 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Loader2, Bot, User, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowUp,
+  Ban,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Copy,
+  Globe,
+  Loader2,
+  Paperclip,
+  Presentation,
+  Search,
+  Sparkles,
+  Wand2,
+  XCircle,
+} from "lucide-react";
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  plan?: PlanStep[];
-  tool_calls?: ToolCall[];
-  status?: 'pending' | 'running' | 'completed' | 'failed';
-}
+// ─── Types ───────────────────────────────────────────────────────
 
 interface PlanStep {
-  step_id: number;
+  step_id?: string | number;
   description: string;
-  tool_name: string;
-  tool_args: Record<string, any>;
-  status?: string;
-  output?: string;
+  tool_name?: string | null;
+  tool_args?: Record<string, any>;
 }
 
-interface ToolCall {
-  name: string;
-  args: Record<string, any>;
-  result?: any;
+interface StepResult {
+  step: string;
+  tool?: string | null;
+  output: string;
+  step_index: number;
+}
+
+interface Verification {
   status?: string;
+  score?: number;
+  feedback?: string;
+}
+
+interface StreamedEvent {
+  type: string;
+  task_id?: string;
+  thread_id?: string;
+  message?: string;
+  timestamp: string;
+  content?: any;
+  status?: string;
+  final_answer?: string;
+  plan?: PlanStep[];
+  verification?: Verification;
+  cost_metrics?: { total_cost_usd?: number };
+  error?: string;
+  error_code?: string;
+  trace?: string[];
+  tool_name?: string;
+  tool_args?: Record<string, any>;
+  step_description?: string;
+  step_index?: number;
+}
+
+export interface RecentTaskSummary {
+  id: string;
+  title: string;
+}
+
+export interface ChatInterfaceHandle {
+  /** Clears the current thread and returns to the empty-state composer. */
+  reset: () => void;
 }
 
 interface ChatInterfaceProps {
-  userId?: string;
-  tenantId?: string;
-  initialMessage?: string;
-  token?: string; // JWT token from auth
+  /** Lets the parent (page.tsx) feed the sidebar's recent-task list. */
+  onTasksChange?: (tasks: RecentTaskSummary[]) => void;
+  onActiveTaskChange?: (id: string | null) => void;
 }
 
-export default function ChatInterface({ userId = "dashboard", tenantId = "default", initialMessage = "", token }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState(initialMessage);
-  const [isLoading, setIsLoading] = useState(false);
+const THREAD_ID_KEY = "synthai_thread_id";
+
+const QUICK_ACTIONS: { icon: React.ReactNode; label: string; prompt: string }[] = [
+  {
+    icon: <Presentation className="h-4 w-4" />,
+    label: "Create slides",
+    prompt: "Create a presentation about AI trends with 5 slides",
+  },
+  {
+    icon: <Globe className="h-4 w-4" />,
+    label: "Build website",
+    prompt: "Build a simple landing page for my startup",
+  },
+  {
+    icon: <Wand2 className="h-4 w-4" />,
+    label: "Design",
+    prompt: "Design a logo and brand guide for a tech company",
+  },
+  {
+    icon: <Search className="h-4 w-4" />,
+    label: "Research",
+    prompt: "Research the latest AI trends and summarize them",
+  },
+];
+
+function statusPillClasses(status: string) {
+  switch (status) {
+    case "completed":
+      return "bg-emerald-500/15 text-emerald-300";
+    case "failed":
+    case "error":
+      return "bg-red-500/15 text-red-300";
+    default:
+      return "bg-brand-500/15 text-brand-300";
+  }
+}
+
+const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(function ChatInterface(
+  { onTasksChange, onActiveTaskChange },
+  ref
+) {
+  const [task, setTask] = useState("");
+  const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
-  
+  const [currentStatus, setCurrentStatus] = useState<
+    "idle" | "connecting" | "running" | "completed" | "failed" | "disconnected" | "error"
+  >("idle");
+
+  const [userMessage, setUserMessage] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanStep[] | null>(null);
+  const [stepResults, setStepResults] = useState<Record<number, StepResult>>({});
+  const [verification, setVerification] = useState<Verification | null>(null);
+  const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
+  const [costMetrics, setCostMetrics] = useState<{ total_cost_usd?: number } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    task_id: string;
+    thread_id: string;
+    tool_name: string;
+    tool_args: Record<string, any>;
+    step_description: string;
+    step_index: number;
+  } | null>(null);
+
+  const [recentTasks, setRecentTasks] = useState<RecentTaskSummary[]>([]);
+
   const wsRef = useRef<WebSocket | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const reconnectAttemptRef = useRef(0);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const threadIdRef = useRef<string | null>(null);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+  const hasStarted = currentStatus !== "idle";
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  // ─── Connection ────────────────────────────────────────────────
 
-// WebSocket connection with authentication
-useEffect(() => {
-  let reconnectTimeout: ReturnType<typeof setTimeout>;
-  let isUnmounted = false;
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-  const connect = () => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    const url = token ? `${wsUrl}?token=${token}` : wsUrl;
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
       setIsConnected(true);
+      reconnectAttemptRef.current = 0;
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'auth_error') {
-        alert('Authentication failed. Please log in again.');
-        return;
+      const data: StreamedEvent = JSON.parse(event.data);
+
+      switch (data.type) {
+        case "task_start": {
+          setCurrentStatus("running");
+          if (data.thread_id) {
+            threadIdRef.current = data.thread_id;
+            localStorage.setItem(THREAD_ID_KEY, data.thread_id);
+            onActiveTaskChange?.(data.thread_id);
+            setRecentTasks((prev) => {
+              const next = [
+                { id: data.thread_id as string, title: data.message || "Untitled task" },
+                ...prev.filter((t) => t.id !== data.thread_id),
+              ].slice(0, 20);
+              onTasksChange?.(next);
+              return next;
+            });
+          }
+          break;
+        }
+        case "planner_output": {
+          setPlan(Array.isArray(data.content) ? data.content : null);
+          break;
+        }
+        case "executor_output": {
+          const result: StepResult = data.content;
+          if (result && typeof result.step_index === "number") {
+            setStepResults((prev) => ({ ...prev, [result.step_index]: result }));
+          }
+          break;
+        }
+        case "verifier_output": {
+          setVerification(data.content || null);
+          break;
+        }
+        case "needs_confirmation": {
+          setPendingConfirmation({
+            task_id: data.task_id || "",
+            thread_id: data.thread_id || threadIdRef.current || "",
+            tool_name: data.tool_name || "",
+            tool_args: data.tool_args || {},
+            step_description: data.step_description || "",
+            step_index: data.step_index ?? 0,
+          });
+          setLoading(false);
+          break;
+        }
+        case "task_complete": {
+          setCurrentStatus((data.status as any) || "completed");
+          setFinalAnswer(data.final_answer || null);
+          setCostMetrics(data.cost_metrics || null);
+          if (Array.isArray(data.plan)) setPlan(data.plan);
+          if (data.verification) setVerification(data.verification);
+          setLoading(false);
+          setPendingConfirmation(null);
+          break;
+        }
+        case "task_error": {
+          setCurrentStatus("failed");
+          setErrorMessage(data.error || "Something went wrong while running this task.");
+          setLoading(false);
+          setPendingConfirmation(null);
+          break;
+        }
+        case "error": {
+          setCurrentStatus("failed");
+          setErrorMessage(data.message || data.error || "Unknown error");
+          setLoading(false);
+          setPendingConfirmation(null);
+          break;
+        }
+        default:
+          break;
       }
-      handleWebSocketMessage(data);
     };
 
     ws.onclose = () => {
-      console.log("WebSocket disconnected");
       setIsConnected(false);
-      if (!isUnmounted) {
-        reconnectTimeout = setTimeout(connect, 3000);
-      }
+      setCurrentStatus((prev) => (prev === "running" ? "disconnected" : prev));
+      const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30000);
+      setTimeout(connectWebSocket, delay);
+      reconnectAttemptRef.current += 1;
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    ws.onerror = () => {
       setIsConnected(false);
     };
 
     wsRef.current = ws;
-  };
+  }, [onActiveTaskChange, onTasksChange]);
 
-  connect();
+  useEffect(() => {
+    connectWebSocket();
+    return () => wsRef.current?.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return () => {
-    isUnmounted = true;
-    clearTimeout(reconnectTimeout);
-    wsRef.current?.close();
-  };
-}, [token]);
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [plan, stepResults, finalAnswer, pendingConfirmation, errorMessage]);
 
-  const handleWebSocketMessage = (data: any) => {
-    const timestamp = new Date(data.timestamp || Date.now());
+  // ─── Actions ───────────────────────────────────────────────────
 
-    switch (data.type) {
-      case 'task_start':
-        setMessages(prev => [...prev, {
-          id: data.task_id || `msg-${Date.now()}`,
-          role: 'system',
-          content: `Starting task: ${data.message || ''}`,
-          timestamp,
-          status: 'running'
-        }]);
-        setIsLoading(true);
-        break;
+  // ─── BUGFIX ──────────────────────────────────────────────────────
+  // The previous version read `task` from component state inside a
+  // useCallback closure, then quick-actions called `setTask(prompt)`
+  // followed by `setTimeout(() => submitTask(), 300)`. Because state
+  // updates are async and `submitTask` was memoized on `[task]`, the
+  // `submitTask` reference captured by the *button's own* onClick
+  // handler was the one built with the OLD `task` value -- so the
+  // 300ms timer fired a submit with an empty message and users saw
+  // "Please type a message" after clicking a quick action.
+  // Accepting an explicit override avoids depending on that timing
+  // entirely.
+  const submitTask = useCallback(
+    (overrideMessage?: string) => {
+      const trimmedMessage = (overrideMessage ?? task).trim();
+      if (!trimmedMessage) return;
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
-      case 'planner_output':
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant') {
-            return prev.map(msg => 
-              msg.id === last.id ? { ...msg, plan: data.content, status: 'running' } : msg
-            );
-          }
-          return [...prev, {
-            id: `plan-${Date.now()}`,
-            role: 'assistant',
-            content: 'Generated plan:',
-            timestamp,
-            plan: data.content,
-            status: 'running'
-          }];
-        });
-        break;
+      const threadId = `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      threadIdRef.current = threadId;
+      localStorage.setItem(THREAD_ID_KEY, threadId);
 
-      case 'executor_output':
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant') {
-            const toolCall = {
-              name: data.content.tool || 'unknown',
-              args: {},
-              result: data.content.output,
-              status: 'completed'
-            };
-            return prev.map(msg => {
-              if (msg.id === last.id) {
-                const toolCalls = [...(msg.tool_calls || []), toolCall];
-                return { ...msg, tool_calls: toolCalls };
-              }
-              return msg;
-            });
-          }
-          return prev;
-        });
-        break;
+      setLoading(true);
+      setCurrentStatus("connecting");
+      setUserMessage(trimmedMessage);
+      setPlan(null);
+      setStepResults({});
+      setVerification(null);
+      setFinalAnswer(null);
+      setCostMetrics(null);
+      setErrorMessage(null);
+      setPendingConfirmation(null);
 
-      case 'verifier_output':
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant') {
-            return prev.map(msg => {
-              if (msg.id === last.id) {
-                const verification = data.content;
-                const status = verification.status === 'PASS' ? 'completed' : 'running';
-                return { ...msg, status, content: msg.content + '\n\nVerification: ' + verification.feedback };
-              }
-              return msg;
-            });
-          }
-          return prev;
-        });
-        break;
+      wsRef.current.send(
+        JSON.stringify({
+          action: "run_task",
+          message: trimmedMessage,
+          user_id: "dashboard",
+          tenant_id: "default",
+          thread_id: threadId,
+        })
+      );
+      setTask("");
+    },
+    [task]
+  );
 
-      case 'task_complete':
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant') {
-            return prev.map(msg => {
-              if (msg.id === last.id) {
-                const finalAnswer = data.final_answer || 'Task completed.';
-                return { ...msg, content: finalAnswer, status: 'completed' };
-              }
-              return msg;
-            });
-          }
-          return [...prev, {
-            id: `answer-${Date.now()}`,
-            role: 'assistant',
-            content: data.final_answer || 'Task completed.',
-            timestamp,
-            status: 'completed'
-          }];
-        });
-        setIsLoading(false);
-        break;
+  const confirmTool = useCallback(() => {
+    if (!pendingConfirmation || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(
+      JSON.stringify({
+        action: "confirm_tool",
+        task_id: pendingConfirmation.task_id,
+        thread_id: pendingConfirmation.thread_id,
+        tool_name: pendingConfirmation.tool_name,
+        step_index: pendingConfirmation.step_index,
+        message: "",
+        user_id: "dashboard",
+        tenant_id: "default",
+      })
+    );
+    setPendingConfirmation(null);
+    setLoading(true);
+  }, [pendingConfirmation]);
 
-      case 'task_error':
-        setMessages(prev => [...prev, {
-          id: `error-${Date.now()}`,
-          role: 'system',
-          content: `Error: ${data.error || 'Unknown error'}`,
-          timestamp,
-          status: 'failed'
-        }]);
-        setIsLoading(false);
-        break;
+  const rejectTool = useCallback(() => {
+    if (!pendingConfirmation || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(
+      JSON.stringify({
+        action: "reject_tool",
+        task_id: pendingConfirmation.task_id,
+        thread_id: pendingConfirmation.thread_id,
+        step_index: pendingConfirmation.step_index,
+        message: "",
+        user_id: "dashboard",
+        tenant_id: "default",
+      })
+    );
+    setPendingConfirmation(null);
+    setLoading(true);
+  }, [pendingConfirmation]);
 
-      default:
-        console.log("Unknown event type:", data.type);
-        break;
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !loading && !pendingConfirmation) {
+        e.preventDefault();
+        submitTask();
+      }
+    },
+    [loading, pendingConfirmation, submitTask]
+  );
 
-  const sendMessage = useCallback(() => {
-    if (!input.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-
-    wsRef.current.send(JSON.stringify({
-      action: 'run_task',
-      message: input.trim(),
-      user_id: userId,
-      tenant_id: tenantId,
-      token: token // optional, already passed via query
-    }));
-  }, [input, userId, tenantId, token]);
-
-  const togglePlan = (messageId: string) => {
-    setExpandedPlans(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(messageId)) newSet.delete(messageId);
-      else newSet.add(messageId);
-      return newSet;
+  const copyAnswer = useCallback(() => {
+    if (!finalAnswer) return;
+    navigator.clipboard.writeText(finalAnswer).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     });
-  };
+  }, [finalAnswer]);
 
-  return (
-    <div className="flex flex-col h-full bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800">
-        <div className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-blue-400" />
-          <span className="font-semibold text-white">Aether Agent</span>
-          <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-            ● {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-        <div className="text-xs text-gray-400">
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin inline" />}
-        </div>
+  const reset = useCallback(() => {
+    setTask("");
+    setCurrentStatus("idle");
+    setUserMessage(null);
+    setPlan(null);
+    setStepResults({});
+    setVerification(null);
+    setFinalAnswer(null);
+    setCostMetrics(null);
+    setErrorMessage(null);
+    setPendingConfirmation(null);
+    setLoading(false);
+    threadIdRef.current = null;
+    onActiveTaskChange?.(null);
+  }, [onActiveTaskChange]);
+
+  useImperativeHandle(ref, () => ({ reset }), [reset]);
+
+  // ─── Render helpers ──────────────────────────────────────────────
+
+  const completedCount = Object.keys(stepResults).length;
+  const totalSteps = plan?.length ?? 0;
+
+  const composer = (
+    <div className="relative">
+      <div className="flex items-end gap-2 rounded-2xl border border-synthai-border bg-synthai-surface-light p-2.5 pl-4 shadow-[0_0_0_1px_rgba(99,102,241,0)] transition-shadow focus-within:border-transparent focus-within:shadow-[0_0_0_1.5px_theme(colors.brand.500)]">
+        <button
+          type="button"
+          title="Attach a file"
+          className="mb-1 shrink-0 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-synthai-surface-hover hover:text-text-secondary"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
+        <textarea
+          rows={1}
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={loading || !!pendingConfirmation}
+          placeholder="Assign a task or type / for more"
+          className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-text-primary placeholder-text-muted outline-none disabled:opacity-60"
+        />
+        <button
+          onClick={() => submitTask()}
+          disabled={loading || !task.trim() || !!pendingConfirmation || !isConnected}
+          title="Send"
+          className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white transition-opacity disabled:opacity-30"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+        </button>
       </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500 text-center">
-            <div>
-              <Bot className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-              <p>Ask me anything about your business.</p>
-              <p className="text-sm">I can help with sales, marketing, finance, and more.</p>
-            </div>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <div key={message.id} className="flex flex-col">
-              <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-3xl rounded-lg px-4 py-2 ${
-                  message.role === 'user' 
-                    ? 'bg-blue-600 text-white' 
-                    : message.role === 'system'
-                    ? 'bg-yellow-900/30 text-yellow-200 border border-yellow-700/30'
-                    : 'bg-gray-800 text-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    {message.role === 'user' ? (
-                      <User className="w-4 h-4" />
-                    ) : message.role === 'system' ? (
-                      <div className="text-yellow-400 text-xs">⚙️</div>
-                    ) : (
-                      <Bot className="w-4 h-4 text-blue-400" />
-                    )}
-                    <span className="text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                    {message.status && (
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        message.status === 'completed' ? 'bg-green-900 text-green-300' :
-                        message.status === 'running' ? 'bg-blue-900 text-blue-300 animate-pulse' :
-                        message.status === 'failed' ? 'bg-red-900 text-red-300' :
-                        'bg-gray-700 text-gray-400'
-                      }`}>
-                        {message.status}
-                      </span>
-                    )}
-                  </div>
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-
-                  {message.plan && message.plan.length > 0 && (
-                    <div className="mt-2">
-                      <button
-                        onClick={() => togglePlan(message.id)}
-                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                      >
-                        {expandedPlans.has(message.id) ? (
-                          <><ChevronUp className="w-3 h-3" /> Hide Plan</>
-                        ) : (
-                          <><ChevronDown className="w-3 h-3" /> Show Plan ({message.plan.length} steps)</>
-                        )}
-                      </button>
-                      {expandedPlans.has(message.id) && (
-                        <div className="mt-2 space-y-2 text-sm bg-gray-900/50 rounded p-2">
-                          {message.plan.map((step, idx) => (
-                            <div key={idx} className="flex items-start gap-2 border-b border-gray-700/50 pb-1 last:border-0">
-                              <span className="text-gray-500 font-mono text-xs">{idx + 1}.</span>
-                              <div className="flex-1">
-                                <div className="text-gray-300">{step.description}</div>
-                                {step.tool_name && step.tool_name !== 'None' && (
-                                  <div className="text-xs text-gray-500">
-                                    🔧 {step.tool_name}
-                                    {step.tool_args && Object.keys(step.tool_args).length > 0 && (
-                                      <span className="ml-1 text-gray-600">
-                                        {JSON.stringify(step.tool_args)}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {message.tool_calls && message.tool_calls.length > 0 && (
-                    <div className="mt-2 text-sm">
-                      <div className="text-xs text-gray-500">Tool Calls:</div>
-                      {message.tool_calls.map((call, idx) => (
-                        <div key={idx} className="ml-2 text-xs text-gray-400 border-l-2 border-gray-600 pl-2">
-                          <div>🔧 {call.name}</div>
-                          {call.result && (
-                            <div className="text-gray-500 truncate">{String(call.result).substring(0, 100)}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-gray-700 p-4 bg-gray-800">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder={isConnected ? "Type your task..." : "Connecting..."}
-            disabled={!isConnected || isLoading}
-            className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400 disabled:opacity-50"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!isConnected || isLoading || !input.trim()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white font-medium flex items-center gap-2 transition-colors"
-          >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Send
-          </button>
-        </div>
-        <div className="text-xs text-gray-500 mt-2 text-center">
-          {isConnected ? 'Connected to agent' : 'Reconnecting...'}
-        </div>
-      </div>
+      {!isConnected && (
+        <p className="mt-2 text-center text-xs text-text-muted">Reconnecting…</p>
+      )}
     </div>
   );
-}
+
+  // ─── Empty state ───────────────────────────────────────────────
+
+  if (!hasStarted) {
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-6">
+        <h1 className="font-serif text-[2.75rem] leading-tight text-text-primary">
+          What can I do for you?
+        </h1>
+        <p className="mb-8 mt-2 text-sm text-text-secondary">
+          Give synthAI a goal — it plans, runs tools, and checks its own work.
+        </p>
+
+        <div className="w-full">{composer}</div>
+
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          {QUICK_ACTIONS.map((qa) => (
+            <button
+              key={qa.label}
+              onClick={() => submitTask(qa.prompt)}
+              className="flex items-center gap-2 rounded-lg border border-synthai-border bg-synthai-surface px-3.5 py-2 text-sm text-text-secondary transition-colors hover:border-brand-500/30 hover:bg-synthai-surface-hover hover:text-text-primary"
+            >
+              <span className="text-brand-400">{qa.icon}</span>
+              {qa.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Active / completed thread ───────────────────────────────────
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 pb-6">
+      <div className="flex-1 space-y-4 py-6">
+        {/* User message */}
+        {userMessage && (
+          <div className="flex justify-end">
+            <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-brand-600/90 px-4 py-2.5 text-[15px] text-white">
+              {userMessage}
+            </div>
+          </div>
+        )}
+
+        {/* Plan checklist */}
+        {plan && plan.length > 0 && (
+          <div className="rounded-xl border border-synthai-border bg-synthai-surface/60 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Plan</p>
+              <span className="text-xs text-text-muted">
+                {completedCount}/{totalSteps} steps
+              </span>
+            </div>
+            <ol className="space-y-2">
+              {plan.map((step, i) => {
+                const result = stepResults[i];
+                const isNext = !result && i === completedCount && loading;
+                return (
+                  <li key={i} className="flex items-start gap-2.5 text-sm">
+                    {result ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    ) : isNext ? (
+                      <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-brand-400" />
+                    ) : (
+                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className={result ? "text-text-primary" : "text-text-secondary"}>
+                        {step.description}
+                        {step.tool_name && (
+                          <span className="ml-2 rounded bg-synthai-surface-hover px-1.5 py-0.5 font-mono text-[11px] text-text-muted">
+                            {step.tool_name}
+                          </span>
+                        )}
+                      </p>
+                      {result && (
+                        <details className="mt-1 group">
+                          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-text-muted hover:text-text-secondary">
+                            <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                            Output
+                          </summary>
+                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-synthai-surface-light p-2.5 text-xs text-text-secondary">
+                            {result.output}
+                          </p>
+                        </details>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
+
+        {/* Verification chip */}
+        {verification && (
+          <div className="flex items-center gap-2 text-xs">
+            {verification.status === "PASS" ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 text-amber-400" />
+            )}
+            <span className="text-text-muted">
+              Verification: {verification.status || "unknown"}
+              {typeof verification.score === "number" && ` · ${verification.score}/100`}
+            </span>
+          </div>
+        )}
+
+        {/* Confirmation banner */}
+        {pendingConfirmation && (
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4">
+            <p className="text-sm text-text-primary">
+              synthAI wants to run{" "}
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-xs font-semibold text-amber-300">
+                {pendingConfirmation.tool_name}
+              </span>
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">{pendingConfirmation.step_description}</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={confirmTool}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                <Check className="h-3.5 w-3.5" /> Confirm
+              </button>
+              <button
+                onClick={rejectTool}
+                className="flex items-center gap-1.5 rounded-lg border border-synthai-border px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-synthai-surface-hover"
+              >
+                <Ban className="h-3.5 w-3.5" /> Reject
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {errorMessage && (
+          <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-4">
+            <p className="text-sm font-medium text-red-300">Something went wrong</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-red-200/80">{errorMessage}</p>
+          </div>
+        )}
+
+        {/* Final answer */}
+        {finalAnswer && (
+          <div className="rounded-xl border border-brand-500/25 bg-brand-500/[0.06] p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-300">
+                <Sparkles className="h-3.5 w-3.5" /> Answer
+              </span>
+              <button
+                onClick={copyAnswer}
+                className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-secondary"
+              >
+                <Copy className="h-3 w-3" /> {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed text-text-primary">{finalAnswer}</p>
+            {typeof costMetrics?.total_cost_usd === "number" && (
+              <p className="mt-2 text-xs text-text-muted">
+                Cost: ${costMetrics.total_cost_usd.toFixed(6)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {loading && !pendingConfirmation && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${statusPillClasses(currentStatus)}`}>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {currentStatus === "connecting" ? "Starting…" : "Working…"}
+            </span>
+          </div>
+        )}
+
+        <div ref={transcriptEndRef} />
+      </div>
+
+      {/* Sticky composer once a thread has started */}
+      <div className="sticky bottom-0 bg-synthai-background pb-2 pt-4">{composer}</div>
+    </div>
+  );
+});
+
+export default ChatInterface;

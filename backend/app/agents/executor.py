@@ -17,6 +17,12 @@ def _estimate_cost(response: Any) -> float:
             return 0.0
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
+        # NOTE: these are DeepSeek's per-token prices, used here because the
+        # "fallback" role defaults to DeepSeek. If NVIDIA_API_KEY is set,
+        # ModelRouter routes "fallback" to Nvidia instead (see
+        # model_router_kimi_deepseek.py) and this will misreport actual
+        # spend for that provider. Not fixed here -- flagging so it isn't
+        # mistaken for accurate billing telemetry.
         return (input_tokens / 1_000_000) * 0.14 + (output_tokens / 1_000_000) * 0.28
     except Exception:
         return 0.0
@@ -104,6 +110,30 @@ class ExecutorNode:
         step_futures = [self._execute_step(plan[i], i, state) for i in ready_steps]
         step_results = await asyncio.gather(*step_futures, return_exceptions=True)
 
+        # ─── BUGFIX ────────────────────────────────────────────────
+        # `return_exceptions=True` means asyncio.gather() catches EVERY
+        # exception raised inside `_execute_step` -- including
+        # ToolConfirmationRequired, which `tasks.py` and
+        # `websocket_handler.py` both specifically `except` further up
+        # the call stack to pause the run and prompt the user.
+        #
+        # Previously that exception was silently treated the same as any
+        # other tool failure a few lines below (folded into
+        # `results.append({"output": f"Error executing step {idx}: ..."})`),
+        # so it never reached those handlers: the irreversible tool never
+        # ran, the user was never shown the confirm/reject prompt, and the
+        # agent just saw a generic "step failed" and (often) burned a
+        # replan trying to work around a confirmation gate it didn't know
+        # existed.
+        #
+        # Re-raise it here so it propagates out of this node exactly as
+        # the caller expects. If more than one parallel step needed
+        # confirmation, raise the first one -- the rest are re-attempted
+        # on resume once the graph replays from this same current_step.
+        for result in step_results:
+            if isinstance(result, ToolConfirmationRequired):
+                raise result
+
         for idx, result in zip(ready_steps, step_results):
             if isinstance(result, Exception):
                 results.append({
@@ -133,6 +163,13 @@ class ExecutorNode:
         new_state["planning_iterations"] = state.get("planning_iterations", 0) + 1
 
         # ── Final answer synthesis (with compressed context) ──────
+        # This gate only fires when final_answer is falsy. That's now
+        # reliably true on every fresh attempt because Verifier clears
+        # final_answer whenever it sets needs_replan=True (see the
+        # corrected verifier.py) -- previously a failed final answer was
+        # left in place across a replan, this gate stayed shut forever,
+        # and the verifier kept re-failing the same stale text instead of
+        # ever seeing a new one, burning through max_replans for nothing.
         if new_current_step >= len(plan) and not state.get("final_answer"):
             if _check_cost_ceiling(new_state):
                 return new_state

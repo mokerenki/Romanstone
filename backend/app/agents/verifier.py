@@ -18,6 +18,31 @@ class Verifier:
         self.model_router = model_router
         logger.info("verifier.initialized")
 
+    def _trigger_replan(self, state: dict, feedback: str) -> None:
+        """
+        Single place that puts the graph into "replan" mode.
+
+        ─── BUGFIX ───────────────────────────────────────────────────
+        Every call site that flips needs_replan=True must also clear
+        final_answer. Previously a failed *final answer* verification
+        set needs_replan=True but left the old (failed) final_answer
+        sitting in state. ExecutorNode only regenerates a final answer
+        when `not state.get("final_answer")`, so after replanning the
+        executor would run the new plan's steps but skip synthesis
+        entirely -- the verifier then re-checked the exact same stale,
+        already-failed answer against the new context, failed it again
+        for the same reason, and replan_count ticked up without the
+        answer ever having a chance to change. That's what was burning
+        through max_replans while never actually producing (or fixing)
+        an answer, and why the agent seemed to give up on "no context"
+        so fast.
+        """
+        state["needs_replan"] = True
+        state["done"] = False
+        state["final_answer"] = None
+        state["replan_feedback"] = feedback
+        state["feedback"] = feedback
+
     async def __call__(self, state: dict) -> dict:
         """
         LangGraph node entry point. Called when the graph reaches the "verifier" node.
@@ -45,7 +70,7 @@ class Verifier:
                 state["done"] = True
                 state["status"] = "completed"
                 return state
-        
+
         # If we have a final answer, verify it
         if final_answer:
             verification = await self.verify_final_answer(overall_goal, final_answer, context)
@@ -55,11 +80,12 @@ class Verifier:
                 state["done"] = True
                 state["status"] = "completed"
             else:
-                # Otherwise, replan
-                state["needs_replan"] = True
-                state["done"] = False
-                state["replan_feedback"] = verification.get("feedback", "Final answer verification failed.")
-                state["feedback"] = verification.get("feedback", "Final answer verification failed.")
+                # Otherwise, replan -- and make sure the stale answer
+                # doesn't survive to block the next synthesis attempt.
+                self._trigger_replan(
+                    state,
+                    verification.get("feedback", "Final answer verification failed."),
+                )
             return state
 
         # If we have a plan but haven't executed it yet, verify the plan
@@ -67,9 +93,10 @@ class Verifier:
             verification = await self.verify_plan(plan, overall_goal)
             state["verification"] = verification
             if verification.get("status") != "PASS":
-                state["needs_replan"] = True
-                state["replan_feedback"] = verification.get("feedback", "Plan verification failed.")
-                state["feedback"] = verification.get("feedback", "Plan verification failed.")
+                self._trigger_replan(
+                    state,
+                    verification.get("feedback", "Plan verification failed."),
+                )
             return state
 
         # If we're in the middle of execution, verify the last step's output
@@ -83,9 +110,10 @@ class Verifier:
                 verification = await self.verify_step_output(step, step_output, expected_outcome)
                 state["verification"] = verification
                 if verification.get("status") != "PASS":
-                    state["needs_replan"] = True
-                    state["replan_feedback"] = verification.get("feedback", "Step verification failed.")
-                    state["feedback"] = verification.get("feedback", "Step verification failed.")
+                    self._trigger_replan(
+                        state,
+                        verification.get("feedback", "Step verification failed."),
+                    )
             else:
                 # All steps have been executed? But no final answer yet – maybe the plan is done.
                 # Let's check if we've executed all steps.

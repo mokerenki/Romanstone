@@ -10,6 +10,20 @@ from app.agents.router import DomainRouter
 logger = structlog.get_logger("aether.graph")
 
 
+def _is_valid_plan(plan) -> bool:
+    """
+    A plan is only usable if it's a non-empty list of step dicts.
+    Both `Planner.generate_plan()` returning `[]` on an LLM/JSON failure
+    and a malformed LLM response getting parsed into the wrong shape
+    (e.g. a dict instead of a list) fall through this check.
+    """
+    return (
+        isinstance(plan, list)
+        and len(plan) > 0
+        and all(isinstance(step, dict) for step in plan)
+    )
+
+
 def create_graph(
     router: KimiDeepSeekRouter,
     domain_router: DomainRouter,
@@ -41,15 +55,45 @@ def create_graph(
         # forever.
         if state.get("done", False):
             return END
+
+        # ─── BUGFIX ─────────────────────────────────────────────
+        # Previously this fell straight through to "executor" any time
+        # `done` wasn't set, even if the planner had just failed (LLM
+        # error / bad JSON) and returned an empty or malformed plan.
+        # The executor would then see an empty plan, immediately mark
+        # the task "completed" with no final_answer, and the task would
+        # silently end with nothing to show the user -- without ever
+        # touching the replan/max_replans machinery at all.
+        #
+        # Route a bad plan back through the planner as a replan instead,
+        # so it's bounded by Planner.max_replans and produces a real
+        # fallback answer (via _synthesize_fallback_answer) instead of
+        # an empty one.
+        if not _is_valid_plan(state.get("plan")):
+            logger.warning(
+                "graph.invalid_plan_from_planner",
+                plan_type=type(state.get("plan")).__name__,
+            )
+            state["needs_replan"] = True
+            state["replan_feedback"] = {
+                "feedback": (
+                    "The previous planning attempt did not produce a usable "
+                    "plan (empty or malformed). Produce a simpler, valid "
+                    "JSON array of steps."
+                )
+            }
+            return "planner"
+
         return "executor"
 
     def should_loop(state):
         # Hard stop - always check first
         if state.get("done", False):
             return END
-        
-        # Check if plan is empty (planner returned [] when max_replans reached)
-        if not state.get("plan") or len(state.get("plan", [])) == 0:
+
+        # Check if plan is empty/malformed (planner returned [] when
+        # max_replans reached, or produced something unusable)
+        if not _is_valid_plan(state.get("plan")):
             logger.warning("graph.empty_plan", state_keys=list(state.keys()))
             state["done"] = True
             state["status"] = "completed"
@@ -85,6 +129,7 @@ def create_graph(
         after_planner,
         {
             "executor": "executor",
+            "planner": "planner",
             END: END,
         },
     )

@@ -54,7 +54,8 @@ class MemoryRetrieverTool(BaseTool):
                     query=query, # property_name in temporal mode
                     mode="temporal", 
                     entity_label=entity_label,
-                    entity_id=entity_id, 
+                    entity_id=entity_id,
+                    property_name=query,
                     query_time=parsed_query_time
                 )
             else:
