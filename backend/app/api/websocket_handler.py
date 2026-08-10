@@ -23,8 +23,110 @@ from app.core.exceptions import ToolConfirmationRequired
 from app.core.errors import TaskErrorCode, to_user_error
 from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
 from app.core.persistence import persist_task_progress
+from app.core.context import synthai
 
 logger = structlog.get_logger("aether.websocket_handler")
+
+
+async def get_task_state_from_checkpoint(thread_id: str) -> Optional[dict]:
+    """Retrieve the last checkpoint state for a thread."""
+    ctx = synthai
+    try:
+        config = {"configurable": {"thread_id": thread_id}}
+        snapshot = await ctx.checkpointer.aget_tuple(config)
+        if snapshot:
+            return snapshot.checkpoint.get("channel_values", {})
+    except Exception as e:
+        logger.error(f"Failed to get checkpoint for {thread_id}: {e}")
+    return None
+
+
+async def resume_task_from_checkpoint(
+    thread_id: str,
+    extra_state: Optional[dict] = None,
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """Resume a task from its last checkpoint."""
+    ctx = synthai
+    
+    state = await get_task_state_from_checkpoint(thread_id)
+    if not state:
+        yield {
+            "type": "error",
+            "message": f"No checkpoint found for thread {thread_id}",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        return
+    
+    if state.get("status") != "paused":
+        yield {
+            "type": "error",
+            "message": f"Task {thread_id} is not paused (status: {state.get('status')})",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        return
+    
+    if extra_state:
+        state.update(extra_state)
+    
+    state["status"] = "running"
+    state["resumed_at"] = datetime.now(timezone.utc).isoformat()
+    
+    graph = create_graph(
+        ctx.model_router,
+        ctx.domain_router,
+        ctx.tool_registry,
+        ctx.checkpointer
+    )
+    
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    try:
+        async for event in graph.astream(state, config=config):
+            event_type = list(event.keys())[0]
+            node_output = event[event_type]
+            yield {
+                "type": "node_output",
+                "node": event_type,
+                "content": node_output,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await persist_task_progress(thread_id, node_output)
+        
+        snapshot = await graph.aget_state(config)
+        final_state = snapshot.values if snapshot else state
+        
+        yield {
+            "type": "task_complete",
+            "status": final_state.get("status", "completed"),
+            "final_answer": final_state.get("final_answer"),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error resuming task {thread_id}")
+        yield {
+            "type": "error",
+            "message": f"Error resuming task: {str(e)}",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+
+async def get_paused_task_state(thread_id: str) -> Optional[dict]:
+    """Get the full state of a paused task for inspection."""
+    state = await get_task_state_from_checkpoint(thread_id)
+    if state and state.get("status") == "paused":
+        return {
+            "thread_id": thread_id,
+            "task": state.get("task"),
+            "plan": state.get("plan", []),
+            "current_step": state.get("current_step", 0),
+            "results": state.get("results", []),
+            "verification": state.get("verification"),
+            "cost_metrics": state.get("cost_metrics", {}),
+            "final_answer": state.get("final_answer"),
+            "paused_at": state.get("paused_at"),
+        }
+    return None
 
 
 async def stream_task_events(
@@ -299,28 +401,167 @@ async def websocket_endpoint(
                 ):
                     await websocket.send_json(event)
                     
+            elif action == "pause_task":
+                thread_id = data.get("thread_id")
+                if not thread_id:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "thread_id is required",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    continue
+                
+                try:
+                    ctx = synthai
+                    config = {"configurable": {"thread_id": thread_id}}
+                    snapshot = await ctx.checkpointer.aget_tuple(config)
+                    
+                    if not snapshot:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Task {thread_id} not found",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                        continue
+                    
+                    state = snapshot.checkpoint.get("channel_values", {})
+                    current_status = state.get("status", "pending")
+                    
+                    if current_status == "paused":
+                        await websocket.send_json({
+                            "type": "task_paused",
+                            "thread_id": thread_id,
+                            "state": state,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                        continue
+                        
+                    if current_status in ["completed", "failed"]:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Task {thread_id} is already {current_status}",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                        continue
+                    
+                    state["status"] = "paused"
+                    state["paused_at"] = datetime.now(timezone.utc).isoformat()
+                    
+                    await ctx.checkpointer.aput(
+                        config,
+                        snapshot.checkpoint,
+                        {"status": "paused"},
+                        {}
+                    )
+                    
+                    await websocket.send_json({
+                        "type": "task_paused",
+                        "thread_id": thread_id,
+                        "state": state,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    
             elif action == "resume_task":
                 thread_id = data.get("thread_id")
                 if not thread_id:
                     await websocket.send_json({
-                        "type": "error", 
-                        "message": "thread_id is required", 
+                        "type": "error",
+                        "message": "thread_id is required",
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     })
                     continue
+                
+                try:
+                    modifications = data.get("modifications")
+                    state = await get_paused_task_state(thread_id)
+                    if not state:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"No paused task found for {thread_id}",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                        continue
                     
-                async for event in stream_task_events(
-                    data.get("message", ""),
-                    data.get("user_id", "anonymous"),
-                    data.get("tenant_id", "default"),
-                    thread_id,
-                    checkpointer,
-                    model_router,
-                    tool_registry,
-                    domain_router,
-                    browser_service,
-                ):
-                    await websocket.send_json(event)
+                    if modifications:
+                        state.update(modifications)
+                        if "plan" in modifications:
+                            state["plan"] = modifications["plan"]
+                            state["current_step"] = 0
+                    
+                    async for event in resume_task_from_checkpoint(thread_id, modifications):
+                        await websocket.send_json(event)
+                        
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    
+            elif action == "modify_step":
+                thread_id = data.get("thread_id")
+                step_index = data.get("step_index")
+                new_step = data.get("new_step")
+                
+                if not all([thread_id, step_index is not None, new_step]):
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "thread_id, step_index, and new_step are required",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+                    continue
+                
+                try:
+                    ctx = synthai
+                    config = {"configurable": {"thread_id": thread_id}}
+                    snapshot = await ctx.checkpointer.aget_tuple(config)
+                    
+                    if not snapshot:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Task {thread_id} not found",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                        continue
+                    
+                    state = snapshot.checkpoint.get("channel_values", {})
+                    plan = state.get("plan", [])
+                    
+                    if isinstance(plan, list) and 0 <= step_index < len(plan):
+                        plan[step_index] = new_step
+                        state["plan"] = plan
+                        
+                        await ctx.checkpointer.aput(
+                            config,
+                            snapshot.checkpoint,
+                            {"plan": plan},
+                            {}
+                        )
+                        
+                        await websocket.send_json({
+                            "type": "step_modified",
+                            "thread_id": thread_id,
+                            "result": {"step_index": step_index, "new_step": new_step},
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Invalid step_index {step_index}",
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                     
             elif action == "ping":
                 await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})

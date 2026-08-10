@@ -1,5 +1,8 @@
+// frontend/src/components/Chatinterface.tsx
+
 "use client";
 
+import React from "react";
 import {
   forwardRef,
   useCallback,
@@ -24,7 +27,15 @@ import {
   Sparkles,
   Wand2,
   XCircle,
+  Pause,
+  Play,
+  Square,
+  Edit,
+  RefreshCw,
+  X,
 } from "lucide-react";
+
+import { StateInspector } from './StateInspector';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -67,6 +78,9 @@ interface StreamedEvent {
   tool_args?: Record<string, any>;
   step_description?: string;
   step_index?: number;
+  state?: any;
+  paused_at?: string;
+  resumed_at?: string;
 }
 
 export interface RecentTaskSummary {
@@ -117,6 +131,8 @@ function statusPillClasses(status: string) {
     case "failed":
     case "error":
       return "bg-red-500/15 text-red-300";
+    case "paused":
+      return "bg-yellow-500/15 text-yellow-300";
     default:
       return "bg-brand-500/15 text-brand-300";
   }
@@ -130,7 +146,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<
-    "idle" | "connecting" | "running" | "completed" | "failed" | "disconnected" | "error"
+    "idle" | "connecting" | "running" | "paused" | "completed" | "failed" | "disconnected" | "error"
   >("idle");
 
   const [userMessage, setUserMessage] = useState<string | null>(null);
@@ -152,17 +168,57 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
   } | null>(null);
 
   const [recentTasks, setRecentTasks] = useState<RecentTaskSummary[]>([]);
+  const [showInspector, setShowInspector] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const threadIdRef = useRef<string | null>(null);
+  const isPausedRef = useRef(false);
 
   const hasStarted = currentStatus !== "idle";
+
+  // ─── Reset Function ─────────────────────────────────────────────
+
+  const reset = useCallback(() => {
+    // Clear all state
+    setTask("");
+    setCurrentStatus("idle");
+    setUserMessage(null);
+    setPlan(null);
+    setStepResults({});
+    setVerification(null);
+    setFinalAnswer(null);
+    setCostMetrics(null);
+    setErrorMessage(null);
+    setPendingConfirmation(null);
+    setLoading(false);
+    setShowInspector(false);
+    threadIdRef.current = null;
+    isPausedRef.current = false;
+    onActiveTaskChange?.(null);
+    
+    // Close and reconnect WebSocket to clear any pending events
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    // Reconnect will happen automatically via the effect
+    
+    console.log("ChatInterface reset - ready for new task");
+  }, [onActiveTaskChange]);
+
+  useImperativeHandle(ref, () => ({ reset }), [reset]);
 
   // ─── Connection ────────────────────────────────────────────────
 
   const connectWebSocket = useCallback(() => {
+    // Don't reconnect if we're paused
+    if (isPausedRef.current) {
+      console.debug("Skipping WebSocket reconnect - task is paused");
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -171,10 +227,22 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
     ws.onopen = () => {
       setIsConnected(true);
       reconnectAttemptRef.current = 0;
+      console.log("WebSocket connected");
     };
 
     ws.onmessage = (event) => {
       const data: StreamedEvent = JSON.parse(event.data);
+
+      // ─── IGNORE EVENTS WHEN PAUSED ─────────────────────────────
+      if (isPausedRef.current) {
+        // Only process pause/resume/error events
+        if (data.type === "task_paused" || data.type === "task_resumed" || data.type === "error") {
+          // Let these through
+        } else {
+          console.debug("Ignoring event while paused:", data.type);
+          return;
+        }
+      }
 
       switch (data.type) {
         case "task_start": {
@@ -221,6 +289,36 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           setLoading(false);
           break;
         }
+        case "task_paused": {
+          // Task was paused - update UI
+          setCurrentStatus("paused");
+          setLoading(false);
+          setPendingConfirmation(null);
+          // Update state if available
+          if (data.state) {
+            if (data.state.plan) setPlan(data.state.plan);
+            if (data.state.results) {
+              const resultsMap: Record<number, any> = {};
+              (data.state.results || []).forEach((r: any) => {
+                if (r.step_index !== undefined) {
+                  resultsMap[r.step_index] = r;
+                }
+              });
+              setStepResults(resultsMap);
+            }
+          }
+          console.log("Task paused:", data.thread_id);
+          break;
+        }
+        case "task_resumed": {
+          // Task was resumed
+          isPausedRef.current = false;
+          setCurrentStatus("running");
+          setLoading(true);
+          setPendingConfirmation(null);
+          console.log("Task resumed:", data.thread_id);
+          break;
+        }
         case "task_complete": {
           setCurrentStatus((data.status as any) || "completed");
           setFinalAnswer(data.final_answer || null);
@@ -229,6 +327,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           if (data.verification) setVerification(data.verification);
           setLoading(false);
           setPendingConfirmation(null);
+          isPausedRef.current = false;
           break;
         }
         case "task_error": {
@@ -236,6 +335,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           setErrorMessage(data.error || "Something went wrong while running this task.");
           setLoading(false);
           setPendingConfirmation(null);
+          isPausedRef.current = false;
           break;
         }
         case "error": {
@@ -243,6 +343,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           setErrorMessage(data.message || data.error || "Unknown error");
           setLoading(false);
           setPendingConfirmation(null);
+          isPausedRef.current = false;
           break;
         }
         default:
@@ -252,10 +353,13 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
     ws.onclose = () => {
       setIsConnected(false);
-      setCurrentStatus((prev) => (prev === "running" ? "disconnected" : prev));
-      const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30000);
-      setTimeout(connectWebSocket, delay);
-      reconnectAttemptRef.current += 1;
+      // Don't auto-reconnect if paused
+      if (!isPausedRef.current) {
+        setCurrentStatus((prev) => (prev === "running" ? "disconnected" : prev));
+        const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 30000);
+        setTimeout(connectWebSocket, delay);
+        reconnectAttemptRef.current += 1;
+      }
     };
 
     ws.onerror = () => {
@@ -267,7 +371,12 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
   useEffect(() => {
     connectWebSocket();
-    return () => wsRef.current?.close();
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -277,26 +386,34 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
   // ─── Actions ───────────────────────────────────────────────────
 
-  // ─── BUGFIX ──────────────────────────────────────────────────────
-  // The previous version read `task` from component state inside a
-  // useCallback closure, then quick-actions called `setTask(prompt)`
-  // followed by `setTimeout(() => submitTask(), 300)`. Because state
-  // updates are async and `submitTask` was memoized on `[task]`, the
-  // `submitTask` reference captured by the *button's own* onClick
-  // handler was the one built with the OLD `task` value -- so the
-  // 300ms timer fired a submit with an empty message and users saw
-  // "Please type a message" after clicking a quick action.
-  // Accepting an explicit override avoids depending on that timing
-  // entirely.
   const submitTask = useCallback(
     (overrideMessage?: string) => {
       const trimmedMessage = (overrideMessage ?? task).trim();
       if (!trimmedMessage) return;
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      
+      // If we're paused, reset first to clear the old thread
+      if (isPausedRef.current || currentStatus === "paused") {
+        reset();
+      }
+      
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        // Try to reconnect
+        connectWebSocket();
+        // Wait a moment then retry
+        setTimeout(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            submitTask(overrideMessage);
+          } else {
+            setErrorMessage("WebSocket not connected. Please try again.");
+          }
+        }, 500);
+        return;
+      }
 
       const threadId = `thread-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       threadIdRef.current = threadId;
       localStorage.setItem(THREAD_ID_KEY, threadId);
+      isPausedRef.current = false;
 
       setLoading(true);
       setCurrentStatus("connecting");
@@ -308,6 +425,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
       setCostMetrics(null);
       setErrorMessage(null);
       setPendingConfirmation(null);
+      setShowInspector(false);
 
       wsRef.current.send(
         JSON.stringify({
@@ -320,7 +438,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
       );
       setTask("");
     },
-    [task]
+    [task, currentStatus, reset, connectWebSocket]
   );
 
   const confirmTool = useCallback(() => {
@@ -358,15 +476,173 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
     setLoading(true);
   }, [pendingConfirmation]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey && !loading && !pendingConfirmation) {
-        e.preventDefault();
-        submitTask();
+  // ─── Pause Handler ─────────────────────────────────────────────
+
+  const handlePause = useCallback(async () => {
+    const threadId = threadIdRef.current;
+    if (!threadId) {
+      console.warn("No thread ID to pause");
+      return;
+    }
+
+    // Set pause flag FIRST to prevent WebSocket events
+    isPausedRef.current = true;
+
+    // Update UI immediately
+    setCurrentStatus("paused");
+    setLoading(false);
+    setPendingConfirmation(null);
+
+    try {
+      const response = await fetch(`/api/tasks/${threadId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: "User requested pause" }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        // Revert if pause failed
+        isPausedRef.current = false;
+        setCurrentStatus("running");
+        setLoading(true);
+        throw new Error(error.detail || 'Failed to pause task');
       }
-    },
-    [loading, pendingConfirmation, submitTask]
-  );
+
+      // Close the WebSocket to stop receiving events
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsConnected(false);
+
+      console.log("Task paused successfully:", threadId);
+
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to pause task');
+      setCurrentStatus("running");
+      setLoading(true);
+    }
+  }, []);
+
+  // ─── Resume Handler ────────────────────────────────────────────
+
+  const handleResume = useCallback(async () => {
+    const threadId = threadIdRef.current;
+    if (!threadId) {
+      console.warn("No thread ID to resume");
+      return;
+    }
+
+    // Clear pause flag BEFORE resuming
+    isPausedRef.current = false;
+
+    setCurrentStatus("connecting");
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/tasks/${threadId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to resume task');
+      }
+
+      // Reconnect WebSocket
+      connectWebSocket();
+
+      // Wait for connection then send resume action
+      const waitForConnection = () => {
+        return new Promise((resolve) => {
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            resolve(true);
+            return;
+          }
+          const checkInterval = setInterval(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              clearInterval(checkInterval);
+              resolve(true);
+            }
+          }, 100);
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            resolve(false);
+          }, 5000);
+        });
+      };
+
+      const connected = await waitForConnection();
+      if (connected && wsRef.current) {
+        wsRef.current.send(
+          JSON.stringify({
+            action: "resume_task",
+            thread_id: threadId,
+            user_id: "dashboard",
+            tenant_id: "default",
+          })
+        );
+        setCurrentStatus("running");
+        setLoading(true);
+      } else {
+        throw new Error("WebSocket connection failed");
+      }
+
+      console.log("Task resumed successfully:", threadId);
+
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to resume task');
+      setLoading(false);
+      setCurrentStatus("paused");
+    }
+  }, [connectWebSocket]);
+
+  // ─── Stop Handler ──────────────────────────────────────────────
+
+  const handleStop = useCallback(async () => {
+    const threadId = threadIdRef.current;
+    if (!threadId) return;
+
+    setLoading(false);
+    setCurrentStatus("failed");
+    setErrorMessage("Task stopped by user");
+    setPendingConfirmation(null);
+    isPausedRef.current = false;
+
+    // Close WebSocket
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+
+    // Remove from paused state if any
+    try {
+      await fetch(`/api/tasks/${threadId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: "Task stopped by user" }),
+      });
+    } catch (err) {
+      // Ignore errors on stop
+    }
+
+    console.log("Task stopped:", threadId);
+  }, []);
+
+  // ─── Reset and New Task ────────────────────────────────────────
+
+  const handleNewTask = useCallback(() => {
+    reset();
+    setTask("");
+  }, [reset]);
+
+  // ─── Copy Answer ───────────────────────────────────────────────
 
   const copyAnswer = useCallback(() => {
     if (!finalAnswer) return;
@@ -376,23 +652,15 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
     });
   }, [finalAnswer]);
 
-  const reset = useCallback(() => {
-    setTask("");
-    setCurrentStatus("idle");
-    setUserMessage(null);
-    setPlan(null);
-    setStepResults({});
-    setVerification(null);
-    setFinalAnswer(null);
-    setCostMetrics(null);
-    setErrorMessage(null);
-    setPendingConfirmation(null);
-    setLoading(false);
-    threadIdRef.current = null;
-    onActiveTaskChange?.(null);
-  }, [onActiveTaskChange]);
-
-  useImperativeHandle(ref, () => ({ reset }), [reset]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !loading && !pendingConfirmation) {
+        e.preventDefault();
+        submitTask();
+      }
+    },
+    [loading, pendingConfirmation, submitTask]
+  );
 
   // ─── Render helpers ──────────────────────────────────────────────
 
@@ -415,7 +683,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           onChange={(e) => setTask(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={loading || !!pendingConfirmation}
-          placeholder="Assign a task or type / for more"
+          placeholder={isPausedRef.current ? "Task paused. Type a new message to reset." : "Assign a task or type / for more"}
           className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-text-primary placeholder-text-muted outline-none disabled:opacity-60"
         />
         <button
@@ -427,8 +695,13 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
         </button>
       </div>
-      {!isConnected && (
+      {!isConnected && !isPausedRef.current && (
         <p className="mt-2 text-center text-xs text-text-muted">Reconnecting…</p>
+      )}
+      {isPausedRef.current && (
+        <p className="mt-2 text-center text-xs text-yellow-400">
+          Task paused. Type a new message or click Resume to continue.
+        </p>
       )}
     </div>
   );
@@ -600,7 +873,90 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           </div>
         )}
 
-        {loading && !pendingConfirmation && (
+        {/* Task Controls - Show when running, paused, or completed */}
+        {(currentStatus === "running" || currentStatus === "paused" || currentStatus === "completed") && (
+          <div className="flex items-center justify-between bg-synthai-surface-light rounded-lg px-4 py-2 border border-synthai-border">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${
+                  currentStatus === "running" ? "bg-green-400 animate-pulse" :
+                  currentStatus === "paused" ? "bg-yellow-400" :
+                  "bg-blue-400"
+                }`} />
+                <span className="text-sm text-text-secondary capitalize">
+                  {currentStatus === "running" ? "Running" :
+                   currentStatus === "paused" ? "Paused" :
+                   "Completed"}
+                </span>
+              </div>
+
+              <div className="flex gap-1 ml-2">
+                {/* Pause - Only show when running */}
+                {currentStatus === "running" && (
+                  <button
+                    onClick={handlePause}
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    title="Pause task"
+                  >
+                    <Pause className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Resume - Only show when paused */}
+                {currentStatus === "paused" && (
+                  <button
+                    onClick={handleResume}
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    title="Resume task"
+                  >
+                    <Play className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Stop - Only show when running or paused */}
+                {(currentStatus === "running" || currentStatus === "paused") && (
+                  <button
+                    onClick={handleStop}
+                    className="p-1.5 rounded-lg hover:bg-red-500/15 text-text-secondary hover:text-red-400 transition-colors"
+                    title="Stop task"
+                  >
+                    <Square className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Modify - Only show when paused */}
+                {currentStatus === "paused" && (
+                  <button
+                    onClick={() => setShowInspector(!showInspector)}
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    title="Modify plan"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* New Task - Always show in task controls */}
+                <button
+                    onClick={handleNewTask}
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    title="New task (reset)"
+                  >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowInspector(!showInspector)}
+              className="text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              {showInspector ? "Hide Details" : "Show Details"}
+            </button>
+          </div>
+        )}
+
+        {/* Loading indicator */}
+        {loading && !pendingConfirmation && currentStatus !== "paused" && (
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${statusPillClasses(currentStatus)}`}>
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -612,8 +968,39 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
         <div ref={transcriptEndRef} />
       </div>
 
+      {/* State Inspector Modal */}
+      {showInspector && threadIdRef.current && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-synthai-background rounded-xl border border-synthai-border max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-text-primary">Task Inspector</h2>
+              <button
+                onClick={() => setShowInspector(false)}
+                className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <StateInspector
+              threadId={threadIdRef.current}
+              onModifyStep={async (id, stepIndex, newStep) => {
+                const response = await fetch(`/api/tasks/${id}/modify-step`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ step_index: stepIndex, new_step: newStep }),
+                });
+                if (!response.ok) throw new Error('Failed to modify step');
+                // Refresh inspector
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Sticky composer once a thread has started */}
-      <div className="sticky bottom-0 bg-synthai-background pb-2 pt-4">{composer}</div>
+      <div className="sticky bottom-0 bg-synthai-background pb-2 pt-4">
+        {composer}
+      </div>
     </div>
   );
 });

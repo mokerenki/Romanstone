@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends
+import structlog
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, List
 from app.core import instances
+
+logger = structlog.get_logger("aether.api.integrations")
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
@@ -39,3 +42,63 @@ async def sync_integration(integration_id: str) -> Dict[str, Any]:
         return {"status": "success", "tools_count": len(tools)}
     except Exception as e:
         return {"error": str(e)}
+
+@router.get("/tools")
+async def list_integration_tools() -> Dict[str, Any]:
+    """List all available tools from all integrations with full schemas."""
+    mcp_registry = instances.mcp_registry
+    if not mcp_registry:
+        return {"tools": [], "total": 0}
+    
+    all_tools = []
+    for name, client in mcp_registry.clients.items():
+        try:
+            tools = await client.list_tools()
+            for tool in tools:
+                all_tools.append({
+                    "id": f"{name}:{tool.name}",
+                    "integration": name,
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.inputSchema,
+                    "status": "connected" if client._session else "disconnected",
+                })
+        except Exception as e:
+            logger.error(f"Failed to list tools for {name}: {e}")
+    
+    return {
+        "tools": all_tools,
+        "total": len(all_tools),
+        "integrations": list(mcp_registry.clients.keys())
+    }
+
+@router.get("/tools/{tool_id}")
+async def get_tool_details(tool_id: str) -> Dict[str, Any]:
+    """Get detailed information about a specific tool."""
+    mcp_registry = instances.mcp_registry
+    if not mcp_registry:
+        raise HTTPException(404, "MCP registry not initialized")
+    
+    parts = tool_id.split(":", 1)
+    if len(parts) != 2:
+        raise HTTPException(400, "Invalid tool ID format. Expected 'integration:tool_name'")
+    
+    integration_name, tool_name = parts
+    client = mcp_registry.clients.get(integration_name)
+    if not client:
+        raise HTTPException(404, f"Integration '{integration_name}' not found")
+    
+    try:
+        tools = await client.list_tools()
+        for tool in tools:
+            if tool.name == tool_name:
+                return {
+                    "name": tool.name,
+                    "integration": integration_name,
+                    "description": tool.description,
+                    "input_schema": tool.inputSchema,
+                    "status": "connected" if client._session else "disconnected",
+                }
+        raise HTTPException(404, f"Tool '{tool_name}' not found in integration '{integration_name}'")
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch tool details: {str(e)}")

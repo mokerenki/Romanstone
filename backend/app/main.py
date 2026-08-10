@@ -9,6 +9,7 @@ from app.tools.document_tool import DocumentTool
 from app.tools.slack_tool import SlackTool
 from typing import Optional
 from datetime import datetime, timezone
+from app.api.history_api import router as history_router
 
 from app.core import instances
 
@@ -180,6 +181,7 @@ app.include_router(heartbeat_config_router)
 app.include_router(tasks_router)
 app.include_router(memory_api_router)
 app.include_router(integrations_router)
+app.include_router(history_router)
 
 # WebSocket endpoint
 @app.websocket("/ws")

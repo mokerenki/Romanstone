@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 from starlette.websockets import WebSocketDisconnect
@@ -30,7 +30,7 @@ from app.core.persistence import (
     set_task_metadata
 )
 from app.graph import create_graph
-from app.api.websocket_handler import stream_task_events
+from app.api.websocket_handler import stream_task_events, get_paused_task_state
 
 logger = structlog.get_logger("synthai.api.tasks")
 router = APIRouter()
@@ -216,7 +216,7 @@ async def memory_retriever(request: Dict[str, Any]):
         return JSONResponse(status_code=500, content={"error": "Memory retrieval failed.", "details": str(exc)})
 
 
-# ─── Background Task Execution ──────────────────────────
+# backend/app/api/tasks.py - Modify _execute_task function
 
 async def _execute_task(
     task_id: str,
@@ -225,14 +225,17 @@ async def _execute_task(
     tenant_id: str,
     thread_id: str,
 ):
-    """Execute task with state management."""
+    """Execute task with state management - UPDATED with history storage."""
     ctx = _get_context()
     
     await set_task_metadata(task_id, {
         "task_id": task_id,
         "thread_id": thread_id,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
         "status": "running",
         "started_at": datetime.now(timezone.utc).isoformat(),
+        "task": user_message,
     })
     
     graph = create_graph(
@@ -273,17 +276,25 @@ async def _execute_task(
             event_type = list(event.keys())[0]
             node_output = event[event_type]
             await persist_task_progress(thread_id, node_output)
+            
+            # NEW: Store checkpoint snapshot after each node
+            await store_checkpoint_snapshot(thread_id, node_output)
         
         snapshot = await graph.aget_state(config)
         final_state = snapshot.values if snapshot else initial_state
         
+        # Store final state in history
+        await store_checkpoint_snapshot(thread_id, final_state)
+        
         await set_task_metadata(task_id, {
             "task_id": task_id,
             "thread_id": thread_id,
+            "user_id": user_id,
             "status": final_state.get("status", "completed"),
             "final_answer": final_state.get("final_answer"),
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "cost_metrics": json.dumps(final_state.get("cost_metrics", {})),
+            "plan": json.dumps(final_state.get("plan", [])),
         })
         
     except ToolConfirmationRequired as e:
@@ -308,7 +319,6 @@ async def _execute_task(
             "failed_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.exception("task_execution_failed", task_id=task_id)
-
 
 # ─── WebSocket Endpoint ──────────────────────────────────
 

@@ -43,11 +43,11 @@ const NAV_ITEMS: NavItem[] = [
   { icon: <Bot className="w-[18px] h-[18px]" />, label: "Agent", href: "/agent", badge: "New" },
   { icon: <Puzzle className="w-[18px] h-[18px]" />, label: "Plugins", href: "/integrations" },
   { icon: <Calendar className="w-[18px] h-[18px]" />, label: "Scheduled", href: "/scheduled" },
+  { icon: <Clock className="w-[18px] h-[18px]" />, label: "History", href: "/history" },
   { icon: <Library className="w-[18px] h-[18px]" />, label: "Library", href: "/library" },
 ];
 
 const SECONDARY_ITEMS: NavItem[] = [
-  { icon: <Clock className="w-[18px] h-[18px]" />, label: "History", href: "/history" },
   { icon: <BarChart3 className="w-[18px] h-[18px]" />, label: "Cost", href: "/cost" },
   { icon: <Settings className="w-[18px] h-[18px]" />, label: "Settings", href: "/settings" },
 ];
