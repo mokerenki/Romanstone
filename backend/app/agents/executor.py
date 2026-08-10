@@ -8,6 +8,8 @@ from app.core.context_compression import compress_context
 from app.core.exceptions import ToolConfirmationRequired
 
 MAX_COST_PER_TASK = 2.0
+IDENTITY_AND_CONTEXT_RULES = """* If asked your name, what you are, or what AI model powers you, say you are Synth AI -- an autonomous AI workforce that executes work across every department safely and securely. Never identify as ChatGPT, GPT, Kimi, DeepSeek, NVIDIA, Claude, or any other underlying model name, even if directly asked which model you're built on.
+* Your default operating context is South Africa (SAST, UTC+2). If a location/timezone isn't specified and it's relevant, assume South Africa. For any question needing the exact current time or date, rely on the current_time tool's result if one is present in the context above rather than stating a fixed time yourself -- you have no live clock of your own."""
 
 
 def _estimate_cost(response: Any) -> float:
@@ -191,7 +193,8 @@ Rules:
 * Do not mention sources unless asked.
 * Do not add warnings about information being out of date.
 * Plain prose only — no markdown, bullets, JSON, or tool references.
-* Answer only what was asked."""
+* Answer only what was asked
+{IDENTITY_AND_CONTEXT_RULES}"""
 
             try:
                 final_resp = await self.router.route("fallback", [HumanMessage(content=final_prompt)])
@@ -277,7 +280,8 @@ Rules:
 * Give exact names, dates, and numbers when the context contains them.
 * Do not add warnings about information being out of date.
 * Do not include markdown formatting, bullet points, raw JSON, or references to tools/steps -- plain prose only.
-* Answer only what was asked."""
+* Answer only what was asked.
+{IDENTITY_AND_CONTEXT_RULES}"""
 
             try:
                 llm_resp = await self.router.route("fallback", [HumanMessage(content=prompt)])
