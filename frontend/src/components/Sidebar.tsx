@@ -40,7 +40,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: <Bot className="w-[18px] h-[18px]" />, label: "Agent", href: "/agent", badge: "New" },
+  { icon: <Bot className="w-[18px] h-[18px]" />, label: "Agent", href: "/", badge: "New" },
   { icon: <Puzzle className="w-[18px] h-[18px]" />, label: "Plugins", href: "/integrations" },
   { icon: <Calendar className="w-[18px] h-[18px]" />, label: "Scheduled", href: "/scheduled" },
   { icon: <Library className="w-[18px] h-[18px]" />, label: "Library", href: "/library" },

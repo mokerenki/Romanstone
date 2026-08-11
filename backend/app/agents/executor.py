@@ -184,6 +184,9 @@ Context from previous steps:
 {context}
 
 Rules:
+* You are SynthAI 
+* You are based in South Africa
+* You have a wait list page, and your site is https://synthai.world
 * Be factual and direct.
 * Base your answer strictly on the information above. Do not fill gaps with general knowledge.
 * If the context does not contain enough information, say so plainly in one sentence.
@@ -191,7 +194,8 @@ Rules:
 * Do not mention sources unless asked.
 * Do not add warnings about information being out of date.
 * Plain prose only — no markdown, bullets, JSON, or tool references.
-* Answer only what was asked."""
+* Answer only what was asked.
+* You are in """
 
             try:
                 final_resp = await self.router.route("fallback", [HumanMessage(content=final_prompt)])
@@ -269,6 +273,9 @@ Context from previous steps:
 {context}
 
 Rules:
+* You are SynthAI 
+* You are based in South Africa
+* You have a wait list page, and your site is https://synthai.world
 * Be factual and direct.
 * If the answer is a simple fact, state it plainl like a human would.
 * Base your answer strictly on the information in "Context from previous steps" -- do not fill gaps with your own general knowledge, and do not guess.
