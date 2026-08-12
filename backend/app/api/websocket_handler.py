@@ -24,6 +24,7 @@ from app.core.errors import TaskErrorCode, to_user_error
 from app.sandbox.manager import SandboxManager, set_active_sandbox_manager, set_active_task_id
 from app.core.persistence import persist_task_progress
 from app.core.context import synthai
+from app.core.history_store import HistoryStore, EventType
 
 logger = structlog.get_logger("aether.websocket_handler")
 
@@ -181,6 +182,8 @@ async def stream_task_events(
         }
         return
 
+    history_store = HistoryStore()
+
     # Create the graph instance for this task
     graph = create_graph(model_router, domain_router, tool_registry, checkpointer)
 
@@ -217,6 +220,25 @@ async def stream_task_events(
     config = {"configurable": {"thread_id": thread_id}}
 
     yield {"type": "task_start", "task_id": task_id, "message": user_message, "timestamp": now}
+
+    try:
+        await history_store.ensure_initialized()
+        existing = await history_store.get_task_history(thread_id)
+        if not existing:
+            await history_store.create_task_record(
+                thread_id=thread_id,
+                task=user_message,
+                user_id=user_id,
+                tenant_id=tenant_id
+            )
+    except Exception as e:
+        logger.warning("history.task_record_create_failed", error=str(e), thread_id=thread_id)
+
+    try:
+        await history_store.ensure_initialized()
+        await history_store.add_event(thread_id, EventType.TASK_START, {"message": user_message})
+    except Exception as e:
+        logger.warning("history.task_start_event_failed", error=str(e), thread_id=thread_id)
 
     try:
         set_active_sandbox_manager(sandbox_manager)
@@ -260,6 +282,30 @@ async def stream_task_events(
         snapshot = await graph.aget_state(config)
         final_state = snapshot.values if snapshot and snapshot.values else initial_state
 
+        try:
+            await history_store.ensure_initialized()
+            await history_store.update_task_status(
+                thread_id=thread_id,
+                status=final_state.get("status", "completed"),
+                final_answer=final_state.get("final_answer"),
+                cost_metrics=final_state.get("cost_metrics")
+            )
+        except Exception as e:
+            logger.warning("history.task_complete_failed", error=str(e), thread_id=thread_id)
+
+        try:
+            await history_store.ensure_initialized()
+            await history_store.add_event(
+                thread_id,
+                EventType.TASK_COMPLETE,
+                {
+                    "status": final_state.get("status", "completed"),
+                    "final_answer": final_state.get("final_answer"),
+                }
+            )
+        except Exception as e:
+            logger.warning("history.task_complete_event_failed", error=str(e), thread_id=thread_id)
+
         yield {
             "type": "task_complete",
             "task_id": final_state.get("task_id", task_id),
@@ -274,6 +320,23 @@ async def stream_task_events(
     except ToolConfirmationRequired as exc:
         # Emit confirmation event and pause — client must send confirm_tool to resume
         logger.info("websocket.confirmation_required", tool=exc.tool_name, step=exc.step_index)
+        try:
+            await history_store.ensure_initialized()
+            await history_store.update_task_status(
+                thread_id=thread_id,
+                status="paused"
+            )
+        except Exception as e:
+            logger.warning("history.task_pause_failed", error=str(e), thread_id=thread_id)
+        try:
+            await history_store.ensure_initialized()
+            await history_store.add_event(
+                thread_id,
+                EventType.TASK_PAUSED,
+                {"tool_name": exc.tool_name, "step_index": exc.step_index}
+            )
+        except Exception as e:
+            logger.warning("history.task_pause_event_failed", error=str(e), thread_id=thread_id)
         yield {
             "type": "needs_confirmation",
             "tool_name": exc.tool_name,
@@ -288,6 +351,24 @@ async def stream_task_events(
     except Exception as exc:
         code, user_message_error = to_user_error(exc)
         logger.exception("websocket_task_execution_failed", error_code=code, error=str(exc))
+        try:
+            await history_store.ensure_initialized()
+            await history_store.update_task_status(
+                thread_id=thread_id,
+                status="failed",
+                error=user_message_error
+            )
+        except Exception as e:
+            logger.warning("history.task_error_failed", error=str(e), thread_id=thread_id)
+        try:
+            await history_store.ensure_initialized()
+            await history_store.add_event(
+                thread_id,
+                EventType.TASK_FAILED,
+                {"error": user_message_error, "error_code": code}
+            )
+        except Exception as e:
+            logger.warning("history.task_error_event_failed", error=str(e), thread_id=thread_id)
         yield {
             "type": "task_error",
             "error_code": code,

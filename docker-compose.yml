@@ -59,6 +59,13 @@ services:
       retries: 10
       start_period: 10s
 
+  mcp-aether77:
+    image: docker.io/mokerenke/synthofficial2:latest
+    restart: unless-stopped
+    shm_size: '1gb'
+    networks:
+      - aether_network
+
   backend:
     build:
       context: ./backend
@@ -93,6 +100,7 @@ services:
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-nvidia/nv-embed-v1}
       OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-meta/llama-3.3-70b-instruct}
       DATABASE_URL: postgresql+asyncpg://aether:aether@postgres:5432/aether
+      MCP_PROFILE_URL: http://mcp-aether77:3000
       COGNEE_ENABLED: "true"
       SANDBOX_ENABLED: "true"
       SANDBOX_RUNTIME: "e2b"

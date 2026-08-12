@@ -1,3 +1,5 @@
+// frontend/tailwind.config.ts
+
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -8,58 +10,44 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1', // Core accent purple/indigo
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
         synthai: {
-          background: '#0a0a16',      // Main deep dark workspace background
-          surface: '#12121f',         // Card / Sidebar background
-          'surface-light': '#1a1a2e',   // Light surface container
-          'surface-hover': '#24243a',   // Interactive hover states
-          border: '#2a2a42',          // Subtle divider lines & input borders
-          text: '#f0f0ff',            // High contrast primary text
-          'text-secondary': '#9090b0',  // Muted body/label text
-          'text-muted': '#606080',      // Low contrast placeholder/icon text
+          background: '#ffffff',
+          surface: '#f7f7f8',
+          'surface-light': '#f0f0f1',
+          'surface-hover': '#e8e8ea',
+          border: '#e4e4e7',
+          text: '#1a1a1e',
+          'text-secondary': '#4a4a50',
+          'text-muted': '#8a8a90',
         },
-        // Direct alias mapping so `text-text-primary`, `text-text-secondary`, 
-        // and `text-text-muted` resolve as expected across all components:
         text: {
-          primary: '#f0f0ff',
-          secondary: '#9090b0',
-          muted: '#606080',
+          primary: '#1a1a1e',
+          secondary: '#4a4a50',
+          muted: '#8a8a90',
         },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, #6366f1, #8b5cf6, #d946ef)',
-        'brand-gradient-subtle': 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1), rgba(217,70,239,0.1))',
-        'glow-radial': 'radial-gradient(circle at center, rgba(99,102,241,0.15) 0%, transparent 70%)',
+        'brand-gradient': 'linear-gradient(135deg, #2563eb, #7c3aed)',
+        'brand-gradient-subtle': 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(124,58,237,0.08))',
       },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'gradient': 'gradient 3s ease infinite',
-        'float': 'float 6s ease-in-out infinite',
-      },
-      keyframes: {
-        gradient: {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
-        float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-10px)' },
-        },
+      boxShadow: {
+        'card': '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+        'card-hover': '0 4px 12px rgba(0,0,0,0.08)',
       },
     },
   },

@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 
 import { StateInspector } from './StateInspector';
+import { SandboxWorkspace } from './SandboxWorkspace';
+import { FolderOpen } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -127,14 +129,14 @@ const QUICK_ACTIONS: { icon: React.ReactNode; label: string; prompt: string }[] 
 function statusPillClasses(status: string) {
   switch (status) {
     case "completed":
-      return "bg-emerald-500/15 text-emerald-300";
+      return "bg-green-100 text-green-700";
     case "failed":
     case "error":
-      return "bg-red-500/15 text-red-300";
+      return "bg-red-100 text-red-700";
     case "paused":
-      return "bg-yellow-500/15 text-yellow-300";
+      return "bg-yellow-100 text-yellow-700";
     default:
-      return "bg-brand-500/15 text-brand-300";
+      return "bg-blue-100 text-blue-700";
   }
 }
 
@@ -169,6 +171,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
   const [recentTasks, setRecentTasks] = useState<RecentTaskSummary[]>([]);
   const [showInspector, setShowInspector] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -194,6 +197,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
     setPendingConfirmation(null);
     setLoading(false);
     setShowInspector(false);
+    setShowWorkspace(false);
     threadIdRef.current = null;
     isPausedRef.current = false;
     onActiveTaskChange?.(null);
@@ -669,11 +673,11 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
   const composer = (
     <div className="relative">
-      <div className="flex items-end gap-2 rounded-2xl border border-synthai-border bg-synthai-surface-light p-2.5 pl-4 shadow-[0_0_0_1px_rgba(99,102,241,0)] transition-shadow focus-within:border-transparent focus-within:shadow-[0_0_0_1.5px_theme(colors.brand.500)]">
+      <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2.5 pl-4 shadow-[0_0_0_1px_rgba(99,102,241,0)] transition-shadow focus-within:border-transparent focus-within:shadow-[0_0_0_1.5px_#3b82f6]">
         <button
           type="button"
           title="Attach a file"
-          className="mb-1 shrink-0 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-synthai-surface-hover hover:text-text-secondary"
+          className="mb-1 shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-synthai-surface-hover hover:text-gray-600"
         >
           <Paperclip className="h-4 w-4" />
         </button>
@@ -684,7 +688,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
           onKeyDown={handleKeyDown}
           disabled={loading || !!pendingConfirmation}
           placeholder={isPausedRef.current ? "Task paused. Type a new message to reset." : "Assign a task or type / for more"}
-          className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-text-primary placeholder-text-muted outline-none disabled:opacity-60"
+          className="max-h-40 flex-1 resize-none bg-transparent py-2 text-[15px] text-gray-900 placeholder-gray-400 outline-none disabled:opacity-60"
         />
         <button
           onClick={() => submitTask()}
@@ -696,7 +700,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
         </button>
       </div>
       {!isConnected && !isPausedRef.current && (
-        <p className="mt-2 text-center text-xs text-text-muted">Reconnecting…</p>
+        <p className="mt-2 text-center text-xs text-gray-400">Reconnecting…</p>
       )}
       {isPausedRef.current && (
         <p className="mt-2 text-center text-xs text-yellow-400">
@@ -710,11 +714,11 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
   if (!hasStarted) {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-6">
-        <h1 className="font-serif text-[2.75rem] leading-tight text-text-primary">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-6 bg-white">
+        <h1 className="font-serif text-[2.75rem] leading-tight text-gray-900">
           What can I do for you?
         </h1>
-        <p className="mb-8 mt-2 text-sm text-text-secondary">
+        <p className="mb-8 mt-2 text-sm text-gray-500">
           Give synthAI a goal — it plans, runs tools, and checks its own work.
         </p>
 
@@ -725,7 +729,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
             <button
               key={qa.label}
               onClick={() => submitTask(qa.prompt)}
-              className="flex items-center gap-2 rounded-lg border border-synthai-border bg-synthai-surface px-3.5 py-2 text-sm text-text-secondary transition-colors hover:border-brand-500/30 hover:bg-synthai-surface-hover hover:text-text-primary"
+              className="flex items-center gap-2 rounded-lg border border-synthai-border bg-synthai-surface px-3.5 py-2 text-sm text-gray-600 transition-colors hover:border-brand-500/30 hover:bg-synthai-surface-hover hover:text-gray-900"
             >
               <span className="text-brand-400">{qa.icon}</span>
               {qa.label}
@@ -739,7 +743,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
   // ─── Active / completed thread ───────────────────────────────────
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 pb-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 pb-6 bg-white">
       <div className="flex-1 space-y-4 py-6">
         {/* User message */}
         {userMessage && (
@@ -752,10 +756,10 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
         {/* Plan checklist */}
         {plan && plan.length > 0 && (
-          <div className="rounded-xl border border-synthai-border bg-synthai-surface/60 p-4">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Plan</p>
-              <span className="text-xs text-text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Plan</p>
+              <span className="text-xs text-gray-400">
                 {completedCount}/{totalSteps} steps
               </span>
             </div>
@@ -770,24 +774,24 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                     ) : isNext ? (
                       <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-brand-400" />
                     ) : (
-                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-text-muted" />
+                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className={result ? "text-text-primary" : "text-text-secondary"}>
+                      <p className={result ? "text-gray-900" : "text-gray-600"}>
                         {step.description}
                         {step.tool_name && (
-                          <span className="ml-2 rounded bg-synthai-surface-hover px-1.5 py-0.5 font-mono text-[11px] text-text-muted">
+                          <span className="ml-2 rounded bg-synthai-surface-hover px-1.5 py-0.5 font-mono text-[11px] text-gray-400">
                             {step.tool_name}
                           </span>
                         )}
                       </p>
                       {result && (
                         <details className="mt-1 group">
-                          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-text-muted hover:text-text-secondary">
+                          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                             <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
                             Output
                           </summary>
-                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-synthai-surface-light p-2.5 text-xs text-text-secondary">
+                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-synthai-surface-light p-2.5 text-xs text-gray-600">
                             {result.output}
                           </p>
                         </details>
@@ -808,7 +812,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
             ) : (
               <XCircle className="h-3.5 w-3.5 text-amber-400" />
             )}
-            <span className="text-text-muted">
+            <span className="text-gray-400">
               Verification: {verification.status || "unknown"}
               {typeof verification.score === "number" && ` · ${verification.score}/100`}
             </span>
@@ -818,13 +822,13 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
         {/* Confirmation banner */}
         {pendingConfirmation && (
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4">
-            <p className="text-sm text-text-primary">
+            <p className="text-sm text-gray-900">
               synthAI wants to run{" "}
               <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-xs font-semibold text-amber-300">
                 {pendingConfirmation.tool_name}
               </span>
             </p>
-            <p className="mt-1 text-xs text-text-secondary">{pendingConfirmation.step_description}</p>
+            <p className="mt-1 text-xs text-gray-600">{pendingConfirmation.step_description}</p>
             <div className="mt-3 flex gap-2">
               <button
                 onClick={confirmTool}
@@ -834,7 +838,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
               </button>
               <button
                 onClick={rejectTool}
-                className="flex items-center gap-1.5 rounded-lg border border-synthai-border px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-synthai-surface-hover"
+                className="flex items-center gap-1.5 rounded-lg border border-synthai-border px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-synthai-surface-hover"
               >
                 <Ban className="h-3.5 w-3.5" /> Reject
               </button>
@@ -852,21 +856,21 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
         {/* Final answer */}
         {finalAnswer && (
-          <div className="rounded-xl border border-brand-500/25 bg-brand-500/[0.06] p-4">
+          <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-300">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-300">
                 <Sparkles className="h-3.5 w-3.5" /> Answer
               </span>
               <button
                 onClick={copyAnswer}
-                className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-secondary"
+                className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-gray-600"
               >
                 <Copy className="h-3 w-3" /> {copied ? "Copied" : "Copy"}
               </button>
             </div>
-            <p className="whitespace-pre-wrap leading-relaxed text-text-primary">{finalAnswer}</p>
+            <p className="whitespace-pre-wrap leading-relaxed text-gray-900">{finalAnswer}</p>
             {typeof costMetrics?.total_cost_usd === "number" && (
-              <p className="mt-2 text-xs text-text-muted">
+              <p className="mt-2 text-xs text-gray-400">
                 Cost: ${costMetrics.total_cost_usd.toFixed(6)}
               </p>
             )}
@@ -883,7 +887,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                   currentStatus === "paused" ? "bg-yellow-400" :
                   "bg-blue-400"
                 }`} />
-                <span className="text-sm text-text-secondary capitalize">
+                <span className="text-sm text-gray-600 capitalize">
                   {currentStatus === "running" ? "Running" :
                    currentStatus === "paused" ? "Paused" :
                    "Completed"}
@@ -895,7 +899,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                 {currentStatus === "running" && (
                   <button
                     onClick={handlePause}
-                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-600 hover:text-gray-900 transition-colors"
                     title="Pause task"
                   >
                     <Pause className="w-4 h-4" />
@@ -906,7 +910,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                 {currentStatus === "paused" && (
                   <button
                     onClick={handleResume}
-                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-600 hover:text-gray-900 transition-colors"
                     title="Resume task"
                   >
                     <Play className="w-4 h-4" />
@@ -917,7 +921,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                 {(currentStatus === "running" || currentStatus === "paused") && (
                   <button
                     onClick={handleStop}
-                    className="p-1.5 rounded-lg hover:bg-red-500/15 text-text-secondary hover:text-red-400 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-red-500/15 text-gray-600 hover:text-red-400 transition-colors"
                     title="Stop task"
                   >
                     <Square className="w-4 h-4" />
@@ -928,7 +932,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                 {currentStatus === "paused" && (
                   <button
                     onClick={() => setShowInspector(!showInspector)}
-                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-600 hover:text-gray-900 transition-colors"
                     title="Modify plan"
                   >
                     <Edit className="w-4 h-4" />
@@ -938,17 +942,26 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
                 {/* New Task - Always show in task controls */}
                 <button
                     onClick={handleNewTask}
-                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-600 hover:text-gray-900 transition-colors"
                     title="New task (reset)"
                   >
                   <RefreshCw className="w-4 h-4" />
+                </button>
+
+                {/* Workspace */}
+                <button
+                  onClick={() => setShowWorkspace(!showWorkspace)}
+                  className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-600 hover:text-gray-900 transition-colors"
+                  title="Open Workspace"
+                >
+                  <FolderOpen className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             <button
               onClick={() => setShowInspector(!showInspector)}
-              className="text-xs text-text-muted hover:text-text-primary transition-colors"
+              className="text-xs text-gray-400 hover:text-gray-900 transition-colors"
             >
               {showInspector ? "Hide Details" : "Show Details"}
             </button>
@@ -957,7 +970,7 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
 
         {/* Loading indicator */}
         {loading && !pendingConfirmation && currentStatus !== "paused" && (
-          <div className="flex items-center gap-2 text-xs text-text-muted">
+          <div className="flex items-center gap-2 text-xs text-gray-400">
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${statusPillClasses(currentStatus)}`}>
               <Loader2 className="h-3 w-3 animate-spin" />
               {currentStatus === "connecting" ? "Starting…" : "Working…"}
@@ -973,10 +986,10 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-synthai-background rounded-xl border border-synthai-border max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-text-primary">Task Inspector</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Task Inspector</h2>
               <button
                 onClick={() => setShowInspector(false)}
-                className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-text-muted hover:text-text-primary"
+                className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-400 hover:text-gray-900"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -997,8 +1010,26 @@ const ChatInterface = forwardRef<ChatInterfaceHandle, ChatInterfaceProps>(functi
         </div>
       )}
 
+      {/* Workspace Modal */}
+      {showWorkspace && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-6xl h-[80vh] bg-synthai-background rounded-xl border border-synthai-border overflow-hidden">
+            <div className="p-3 border-b border-synthai-border bg-synthai-surface-light flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-900">Agent Workspace</h2>
+              <button
+                onClick={() => setShowWorkspace(false)}
+                className="p-1.5 rounded-lg hover:bg-synthai-surface-hover text-gray-400 hover:text-gray-900"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <SandboxWorkspace userId="default" />
+          </div>
+        </div>
+      )}
+
       {/* Sticky composer once a thread has started */}
-      <div className="sticky bottom-0 bg-synthai-background pb-2 pt-4">
+      <div className="sticky bottom-0 bg-white pb-2 pt-4">
         {composer}
       </div>
     </div>

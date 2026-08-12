@@ -10,6 +10,11 @@ from app.tools.slack_tool import SlackTool
 from typing import Optional
 from datetime import datetime, timezone
 from app.api.history_api import router as history_router
+from app.api.connectors import router as connectors_router
+from app.api.sandbox_api import router as sandbox_router
+from app.sandbox.persistent_manager import persistent_sandbox_manager
+from app.mcp_clients.mcp_registry import MCPRegistry
+
 
 from app.core import instances
 
@@ -34,6 +39,8 @@ from app.tools.registry import ToolRegistry
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.tools.whatsapp_tool import WhatsAppTool
+from app.services.captcha_solver import captcha_solver
+from app.services.auth_handler import auth_handler
 from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
 from app.core.context import synthai
@@ -97,6 +104,8 @@ async def lifespan(app: FastAPI):
     logger.info("builtin_tools.registered", count=len(app.state.tool_registry.list_tools()))
 
     app.state.mcp_registry = MCPRegistry()
+    app.state.mcp_registry = MCPRegistry()
+    await app.state.mcp_registry.initialize()
     await app.state.mcp_registry.register_all_tools(app.state.tool_registry)
     logger.info("mcp_tools.registered")
 
@@ -130,6 +139,13 @@ async def lifespan(app: FastAPI):
         started_at=datetime.now(timezone.utc).isoformat(),
     )
     logger.info("synthai_context.initialized")
+
+    # Initialize persistent sandbox manager
+    await persistent_sandbox_manager.initialize()
+    logger.info("persistent_sandbox.initialized")
+
+    # Store in app state
+    app.state.persistent_sandbox_manager = persistent_sandbox_manager
 
     # Also update legacy instances for backward compatibility
     instances.tool_registry = app.state.tool_registry
@@ -182,6 +198,8 @@ app.include_router(tasks_router)
 app.include_router(memory_api_router)
 app.include_router(integrations_router)
 app.include_router(history_router)
+app.include_router(sandbox_router)
+app.include_router(connectors_router)  # New connectors API router
 
 # WebSocket endpoint
 @app.websocket("/ws")

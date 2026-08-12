@@ -102,3 +102,42 @@ async def get_tool_details(tool_id: str) -> Dict[str, Any]:
         raise HTTPException(404, f"Tool '{tool_name}' not found in integration '{integration_name}'")
     except Exception as e:
         raise HTTPException(500, f"Failed to fetch tool details: {str(e)}")
+
+# backend/app/api/integrations.py - Add test endpoint
+
+@router.get("/test")
+async def test_mcp_connection() -> Dict[str, Any]:
+    """Test MCP connection and list available tools."""
+    mcp_registry = instances.mcp_registry
+    if not mcp_registry:
+        return {"error": "MCP registry not initialized"}
+    
+    status = {
+        "clients": list(mcp_registry.clients.keys()),
+        "client_status": {},
+        "tools": []
+    }
+    
+    for name, client in mcp_registry.clients.items():
+        connected = client._connected
+        status["client_status"][name] = {
+            "connected": connected,
+            "url": client.url,
+        }
+        if connected:
+            try:
+                tools = await client.list_tools()
+                status["client_status"][name]["tools_count"] = len(tools)
+                status["client_status"][name]["tools"] = [
+                    {"name": t.name, "description": t.description}
+                    for t in tools[:5]  # Show first 5 tools
+                ]
+            except Exception as e:
+                status["client_status"][name]["error"] = str(e)
+    
+    # Get all registered tools from tool registry
+    tool_registry = instances.tool_registry
+    if tool_registry:
+        status["all_tools"] = tool_registry.list_tools()
+    
+    return status
