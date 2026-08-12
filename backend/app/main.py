@@ -8,12 +8,14 @@ from app.tools.calendar_tool import CalendarTool
 from app.tools.document_tool import DocumentTool
 from app.tools.slack_tool import SlackTool
 from typing import Optional
+# from app.tools.browser_control_tool import BrowserControlTool
 from datetime import datetime, timezone
 from app.api.history_api import router as history_router
 from app.api.connectors import router as connectors_router
 from app.api.sandbox_api import router as sandbox_router
 from app.sandbox.persistent_manager import persistent_sandbox_manager
 from app.mcp_clients.mcp_registry import MCPRegistry
+from app.tools.chart_visualization_tool import ChartVisualizationTool
 
 
 from app.core import instances
@@ -33,16 +35,15 @@ from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
 from app.core.redis_checkpointer import RedisCheckpointer
 from app.memory.cognee_setup import CogneeMemory
-from app.mcp_clients.mcp_registry import MCPRegistry
 from app.agents.router import DomainRouter
 from app.tools.registry import ToolRegistry
 from app.tools.browser_tool import BrowserTool
 from app.tools.python_repl import PythonREPLTool
 from app.tools.whatsapp_tool import WhatsAppTool
+from app.services.browser_automation_service import BrowserAutomationService
 from app.services.captcha_solver import captcha_solver
 from app.services.auth_handler import auth_handler
 from app.memory.retriever_tool import MemoryRetrieverTool
-from app.services.browser_automation_service import BrowserAutomationService
 from app.core.context import synthai
 
 logger = structlog.get_logger("aether.main")
@@ -100,10 +101,16 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry.register(EmailTool())
     app.state.tool_registry.register(CalendarTool())
     app.state.tool_registry.register(DocumentTool())
+    # app.state.tool_registry.register(BrowserControlTool())
     app.state.tool_registry.register(SlackTool())
     logger.info("builtin_tools.registered", count=len(app.state.tool_registry.list_tools()))
 
-    app.state.mcp_registry = MCPRegistry()
+    app.state.tool_registry.register(ChartVisualizationTool())
+    logger.info("chart_visualization_tool.registered")
+
+    # app.state.tool_registry.register(BrowserControlTool())
+    # logger.info("browser_control_tool.registered")
+
     app.state.mcp_registry = MCPRegistry()
     await app.state.mcp_registry.initialize()
     await app.state.mcp_registry.register_all_tools(app.state.tool_registry)

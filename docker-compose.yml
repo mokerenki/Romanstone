@@ -59,12 +59,12 @@ services:
       retries: 10
       start_period: 10s
 
-  mcp-aether77:
-    image: docker.io/mokerenke/synthofficial2:latest
-    restart: unless-stopped
-    shm_size: '1gb'
-    networks:
-      - aether_network
+  # mcp-aether77:
+  #   image: docker.io/mokerenke/synthofficial2:latest
+  #   restart: unless-stopped
+  #   shm_size: '1gb'
+  #   networks:
+  #     - aether_network
 
   backend:
     build:
