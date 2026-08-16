@@ -59,6 +59,79 @@ services:
       retries: 10
       start_period: 10s
 
+  n8n:
+    image: n8nio/n8n:2.34.0
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}/
+      N8N_EDITOR_BASE_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY in .env}
+      GENERIC_TIMEZONE: ${TZ:-Africa/Johannesburg}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      NANGO_PROXY_URL: http://nango-server:3003
+      NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aether_network
+
+  nango-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nango
+      POSTGRES_PASSWORD: ${NANGO_DB_PASSWORD:-nango}
+      POSTGRES_DB: nango
+    volumes:
+      - nango_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nango -d nango"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aether_network
+
+  nango-server:
+    image: nangohq/nango-server:hosted
+    environment:
+      NANGO_ENCRYPTION_KEY: ${NANGO_ENCRYPTION_KEY:?Set NANGO_ENCRYPTION_KEY in .env}
+      NANGO_DB_USER: nango
+      NANGO_DB_PASSWORD: ${NANGO_DB_PASSWORD:-nango}
+      NANGO_DB_HOST: nango-db
+      NANGO_DB_NAME: nango
+      NANGO_DB_SSL: "false"
+      RECORDS_DATABASE_URL: postgresql://nango:${NANGO_DB_PASSWORD:-nango}@nango-db:5432/nango
+      SERVER_PORT: 3003
+      NANGO_SERVER_URL: ${NANGO_PUBLIC_URL:-http://localhost:3003}
+      NANGO_PUBLIC_SERVER_URL: ${NANGO_PUBLIC_URL:-http://localhost:3003}
+      NANGO_PUBLIC_CONNECT_URL: ${NANGO_CONNECT_URL:-http://localhost:3009}
+      NANGO_CONNECT_UI_PORT: 3009
+      FLAG_SERVE_CONNECT_UI: "true"
+      FLAG_AUTH_ENABLED: "false"
+      NANGO_DASHBOARD_USERNAME: ${NANGO_DASHBOARD_USERNAME:-admin}
+      NANGO_DASHBOARD_PASSWORD: ${NANGO_DASHBOARD_PASSWORD:-}
+      NANGO_LOGS_ENABLED: "false"
+      TELEMETRY: "false"
+    ports:
+      - "127.0.0.1:3003:3003"
+      - "127.0.0.1:3009:3009"
+    depends_on:
+      nango-db:
+        condition: service_healthy
+    networks:
+      - aether_network
+
   backend:
     build:
       context: ./backend
@@ -99,6 +172,13 @@ services:
       E2B_API_KEY: ${E2B_API_KEY:-}
       RBAC_ENABLED: "false"
       MORNING_BRIEFING_TIME: ${MORNING_BRIEFING_TIME:-05:00}
+      N8N_API_URL: http://n8n:5678
+      N8N_PUBLIC_URL: ${N8N_PUBLIC_URL:-http://localhost:5678}
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      NANGO_API_URL: http://nango-server:3003
+      NANGO_PUBLIC_URL: ${NANGO_PUBLIC_URL:-http://localhost:3003}
+      NANGO_CONNECT_URL: ${NANGO_CONNECT_URL:-http://localhost:3009}
+      NANGO_SECRET_KEY: ${NANGO_SECRET_KEY:-}
       # CORS is same-origin through nginx now, but keep this set in case
       # something calls the backend directly (e.g. server-to-server, tests).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
@@ -168,3 +248,5 @@ volumes:
   redis_data:
   aether_sandbox:
   aether_kuzu:
+  n8n_data:
+  nango_postgres_data:

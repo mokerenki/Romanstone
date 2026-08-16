@@ -51,6 +51,10 @@ npm install
 npm run dev
 ```
 
+## Plugins and integrations
+
+See [Plugins, Nango, and n8n](docs/plugins.md) for the plugin registry, OAuth connection flow, n8n MCP workflow requirements, and how to add a new provider.
+
 ## Phase Status
 
 | Phase | Status | Key Deliverables |

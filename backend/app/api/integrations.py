@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,11 @@ from app.services.integration_store import (
     resolve_status,
     save_connection,
 )
+from app.services.n8n import INTEGRATION_CONFIG, N8nClient, N8nError
+from app.services.nango import NANGO_INTEGRATIONS, NangoClient, NangoError
+from app.mcp_clients.base_mcp_client import MCPClient
+from app.mcp_clients.user_scoped_tool import UserScopedMCPTool
+from app.services.plugin_registry import discover_mcp_workflows, list_plugins, workflow_matches
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
@@ -118,6 +124,8 @@ OAUTH_URLS = {
 class ConnectRequest(BaseModel):
     api_key: Optional[str] = Field(default=None, description="API key or bot token")
     token: Optional[str] = Field(default=None, description="OAuth access token")
+    connection_id: Optional[str] = Field(default=None, description="Nango connection ID")
+    provider_config_key: Optional[str] = Field(default=None, description="Nango provider configuration key")
 
 
 def _mcp_status() -> Dict[str, bool]:
@@ -152,6 +160,29 @@ async def _build_catalog(user_id: str) -> List[Dict[str, Any]]:
             }
         )
     return catalog
+
+
+async def _build_plugin_registry(user_id: str) -> List[Dict[str, Any]]:
+    """Merge durable registry rows, n8n capability, and user connection state."""
+    plugins, workflows, connections = await asyncio.gather(
+        list_plugins(), discover_mcp_workflows(), list_connections(user_id)
+    )
+    merged: List[Dict[str, Any]] = []
+    for plugin in plugins:
+        connection = connections.get(plugin["id"])
+        has_workflow = any(workflow_matches(plugin, workflow) for workflow in workflows)
+        supported = plugin["auth_status_source"] == "nango" and has_workflow
+        merged.append({
+            **plugin,
+            # Client-facing aliases retained for existing visual components.
+            "name": plugin["display_name"],
+            "capabilities": plugin["feature_bullets"],
+            "has_n8n_mcp_workflow": has_workflow,
+            "can_connect": supported,
+            "status": "connected" if connection else "disconnected",
+            "connected_at": connection.get("connected_at") if connection else None,
+        })
+    return merged
 
 
 def _oauth_redirect_uri() -> str:
@@ -214,18 +245,24 @@ def _build_oauth_url(entry: Dict[str, Any]) -> Optional[str]:
 
 @router.get("/catalog")
 async def get_catalog(user_id: str = Query(default=DEFAULT_USER_ID)) -> Dict[str, Any]:
-    """Browse all available integrations with connection status."""
-    catalog = await _build_catalog(user_id)
+    """Backward-compatible catalog endpoint backed by plugin_registry."""
+    catalog = await _build_plugin_registry(user_id)
     connected = [c for c in catalog if c["status"] == "connected"]
     return {"catalog": catalog, "connected_count": len(connected)}
 
 
 @router.get("/")
 async def list_integrations(user_id: str = Query(default=DEFAULT_USER_ID)) -> Dict[str, Any]:
-    """List connected integrations."""
-    catalog = await _build_catalog(user_id)
-    integrations = [c for c in catalog if c["status"] == "connected"]
+    """Dynamic plugin registry, including live capability and connection state."""
+    integrations = await _build_plugin_registry(user_id)
     return {"integrations": integrations}
+
+
+@router.get("/status")
+async def integration_status(user_id: str = Query(default=DEFAULT_USER_ID)) -> Dict[str, Any]:
+    """Return the current user's connection state for every registry provider."""
+    plugins = await _build_plugin_registry(user_id)
+    return {"statuses": [{"provider_key": p["provider_key"], "id": p["id"], "status": p["status"]} for p in plugins]}
 
 
 @router.get("/{integration_id}")
@@ -253,15 +290,21 @@ async def get_integration(integration_id: str, user_id: str = Query(default=DEFA
 
 
 @router.get("/{integration_id}/connect")
-async def get_connect_info(integration_id: str) -> Dict[str, Any]:
-    """Return OAuth URL or instructions for connecting an integration."""
+async def get_connect_info(
+    integration_id: str,
+    user_id: str = Query(default=DEFAULT_USER_ID),
+    tenant_id: str = Query(default="default"),
+) -> Dict[str, Any]:
+    """Create a short-lived Nango Connect session for OAuth providers."""
     entry = CATALOG_BY_ID.get(integration_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Integration not found")
 
-    oauth_url = _build_oauth_url(entry)
-    if oauth_url:
-        return {"auth_type": "oauth", "oauth_url": oauth_url}
+    if integration_id in NANGO_INTEGRATIONS:
+        try:
+            return {"auth_type": "nango", **(await NangoClient().create_connect_session(user_id, tenant_id, integration_id))}
+        except NangoError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     if entry.get("auth_type") == "api_key":
         return {
@@ -285,19 +328,41 @@ async def connect_integration(
     body: ConnectRequest,
     user_id: str = Query(default=DEFAULT_USER_ID),
 ) -> Dict[str, Any]:
-    """Connect an integration via API key/token (OAuth callback uses this too)."""
+    """Provision the user's encrypted n8n credential and MCP workflow."""
     entry = CATALOG_BY_ID.get(integration_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Integration not found")
 
+    now = datetime.now(timezone.utc).isoformat()
+    if integration_id in NANGO_INTEGRATIONS:
+        connection_id = (body.connection_id or "").strip()
+        provider_config_key = (body.provider_config_key or "").strip()
+        if not connection_id or not provider_config_key:
+            raise HTTPException(status_code=400, detail="Nango connection ID and provider configuration key are required")
+        if provider_config_key != NANGO_INTEGRATIONS[integration_id]:
+            raise HTTPException(status_code=400, detail="Unexpected Nango provider configuration")
+        try:
+            provisioned = await N8nClient().provision(integration_id, user_id, connection_id, provider_config_key)
+        except N8nError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        await save_connection(
+            user_id,
+            integration_id,
+            auth_type="n8n",
+            connected_at=now,
+            metadata={**provisioned, "nango_connection_id": connection_id, "nango_provider_config_key": provider_config_key},
+        )
+        await _register_n8n_tools(integration_id, provisioned)
+        return {
+            "status": "connected",
+            "integration_id": integration_id,
+            "connected_at": now,
+            "workflow_id": provisioned["workflow_id"],
+        }
+
     credential = (body.api_key or body.token or "").strip()
     if not credential:
-        oauth_url = _build_oauth_url(entry)
-        if oauth_url:
-            return {"status": "redirect", "oauth_url": oauth_url}
         raise HTTPException(status_code=400, detail="API key or token is required")
-
-    now = datetime.now(timezone.utc).isoformat()
     await save_connection(
         user_id,
         integration_id,
@@ -317,14 +382,47 @@ async def disconnect_integration(
     if not entry:
         raise HTTPException(status_code=404, detail="Integration not found")
 
+    connection = await get_connection(user_id, integration_id)
+    if connection and connection.get("auth_type") == "n8n":
+        await N8nClient().delete(connection.get("metadata", {}))
     await delete_connection(user_id, integration_id)
     return {"status": "disconnected", "integration_id": integration_id}
 
 
+async def _register_n8n_tools(integration_id: str, metadata: Dict[str, Any]) -> int:
+    """Discover n8n tools once, then register secure current-user wrappers."""
+    registry = instances.mcp_registry
+    tool_registry = instances.tool_registry
+    if not registry or not tool_registry:
+        return 0
+    client = MCPClient(
+        name=f"n8n:{integration_id}",
+        url=metadata["mcp_url"],
+        headers={"Authorization": f"Bearer {metadata['mcp_token']}"},
+    )
+    try:
+        tools = await client.list_tools()
+        for tool in tools:
+            tool_registry.register(UserScopedMCPTool(integration_id, tool.name, tool.description or tool.name, tool.inputSchema or {}))
+        return len(tools)
+    finally:
+        await client.close()
+
+
 @router.post("/{integration_id}/sync")
-async def sync_integration(integration_id: str) -> Dict[str, Any]:
+async def sync_integration(integration_id: str, user_id: str = Query(default=DEFAULT_USER_ID)) -> Dict[str, Any]:
     """Force sync tools from an MCP server."""
     entry = CATALOG_BY_ID.get(integration_id)
+    if integration_id in INTEGRATION_CONFIG:
+        connection = await get_connection(user_id, integration_id)
+        if not connection:
+            raise HTTPException(status_code=409, detail="Connect this integration first")
+        try:
+            tools_count = await _register_n8n_tools(integration_id, connection.get("metadata", {}))
+            return {"status": "success", "tools_count": tools_count, "integration_id": integration_id}
+        except Exception as exc:
+            return {"error": str(exc), "integration_id": integration_id}
+
     mcp_id = (entry or {}).get("mcp_id") or integration_id
 
     mcp_registry = instances.mcp_registry

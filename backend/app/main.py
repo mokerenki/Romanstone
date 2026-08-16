@@ -36,6 +36,7 @@ from app.tools.whatsapp_tool import WhatsAppTool
 from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
 from app.core.context import synthai
+from app.services.plugin_registry import ensure_registry
 
 logger = structlog.get_logger("aether.main")
 
@@ -47,6 +48,9 @@ async def lifespan(app: FastAPI):
     Initializes and cleans up resources like Redis, CogneeMemory, and ProactiveScheduler.
     """
     logger.info("application.startup")
+
+    await ensure_registry()
+    logger.info("plugin_registry.seeded")
 
     # Initialize Redis client for checkpointer, task queue, and embedding cache
     app.state.redis_client = aioredis.from_url(settings.redis_url)

@@ -117,6 +117,8 @@ async def stream_task_events(
     yield {"type": "task_start", "task_id": task_id, "message": user_message, "timestamp": now}
 
     try:
+        from app.core.integration_context import current_integration_user
+        integration_user_token = current_integration_user.set(user_id)
         set_active_sandbox_manager(sandbox_manager)
         set_active_task_id(sandbox_task_id)
         initial_state["sandbox_id"] = sandbox_task_id
@@ -194,6 +196,8 @@ async def stream_task_events(
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     finally:
+        if 'integration_user_token' in locals():
+            current_integration_user.reset(integration_user_token)
         set_active_sandbox_manager(None)
         set_active_task_id(None)
         await sandbox_manager.destroy(sandbox_task_id)

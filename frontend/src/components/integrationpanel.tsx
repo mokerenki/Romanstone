@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Nango from "@nangohq/frontend";
 import {
   Calendar,
   Check,
@@ -27,16 +28,24 @@ interface CatalogEntry {
   category: string;
   capabilities: string[];
   auth_type: string;
+  provider_key: string;
+  auth_status_source: "nango" | "manual" | "unsupported";
+  can_connect: boolean;
+  has_n8n_mcp_workflow: boolean;
   status: IntegrationStatus;
   connected_at?: string | null;
   icon?: string;
 }
 
 interface ConnectInfo {
-  auth_type: "oauth" | "api_key" | "manual";
+  auth_type: "oauth" | "api_key" | "manual" | "nango";
   oauth_url?: string;
   message?: string;
   env_var?: string;
+  session_token?: string;
+  host?: string;
+  connect_url?: string;
+  provider_config_key?: string;
 }
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -108,6 +117,44 @@ function ConnectModal({
         return;
       }
 
+      if (connectInfo?.auth_type === "nango") {
+        // Connect sessions expire quickly. Fetch one only when the user is
+        // ready to authorize, instead of reusing the session fetched when the
+        // modal opened. This also keeps self-hosted Connect on our Nango API.
+        const sessionResponse = await fetch(`/api/integrations/${entry.id}/connect`);
+        const session = await sessionResponse.json() as ConnectInfo;
+        if (!sessionResponse.ok || !session.session_token || !session.host || !session.connect_url) {
+          throw new Error((session as { detail?: string }).detail || "Unable to start authorization");
+        }
+        const nango = new Nango({ host: session.host });
+        nango.openConnectUI({
+          sessionToken: session.session_token,
+          baseURL: session.connect_url,
+          apiURL: session.host,
+          onEvent: async (event) => {
+            if (event.type !== "connect") return;
+            const payload = event.payload as { connectionId: string; providerConfigKey: string };
+            try {
+              const res = await fetch(`/api/integrations/${entry.id}/connect`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  connection_id: payload.connectionId,
+                  provider_config_key: payload.providerConfigKey,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.detail || "Connection failed");
+              onConnected();
+              onClose();
+            } catch (connectError) {
+              setError(connectError instanceof Error ? connectError.message : "Connection failed");
+            }
+          },
+        });
+        return;
+      }
+
       const res = await fetch(`/api/integrations/${entry.id}/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,7 +206,11 @@ function ConnectModal({
               ))}
             </ul>
 
-            {connectInfo?.auth_type === "oauth" && connectInfo.oauth_url ? (
+            {connectInfo?.auth_type === "nango" ? (
+              <p className="mb-4 text-sm text-text-secondary">
+                Continue to {entry.name} to authorize SynthAI. Your credentials stay with the secure connection service.
+              </p>
+            ) : connectInfo?.auth_type === "oauth" && connectInfo.oauth_url ? (
               <p className="mb-4 text-sm text-text-secondary">
                 Sign in with {entry.name} to grant synthAI access to your workspace.
               </p>
@@ -192,12 +243,12 @@ function ConnectModal({
               </button>
               <button
                 onClick={handleConnect}
-                disabled={submitting || (connectInfo?.auth_type !== "oauth" && !apiKey && !connectInfo?.oauth_url)}
+                disabled={submitting || (connectInfo?.auth_type !== "oauth" && connectInfo?.auth_type !== "nango" && !apiKey && !connectInfo?.oauth_url)}
                 className="btn-gradient flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm disabled:opacity-50"
               >
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : connectInfo?.oauth_url ? (
+                ) : connectInfo?.oauth_url || connectInfo?.auth_type === "nango" ? (
                   <>
                     <ExternalLink className="h-4 w-4" />
                     Authorize
@@ -228,10 +279,10 @@ export default function IntegrationPanel() {
   const fetchCatalog = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/integrations/catalog");
+      const res = await fetch("/api/integrations");
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setCatalog(data.catalog || []);
+      setCatalog(data.integrations || []);
     } catch (e) {
       console.error("Failed to fetch integrations:", e);
     } finally {
@@ -416,13 +467,22 @@ export default function IntegrationPanel() {
                             Disconnect
                           </button>
                         </>
-                      ) : (
+                      ) : entry.can_connect ? (
                         <button
                           onClick={() => setConnectTarget(entry)}
                           className="btn-gradient flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium"
                         >
                           <Plug className="h-3.5 w-3.5" />
                           Connect
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          title={entry.auth_status_source === "unsupported" ? "This provider is not supported yet." : "A matching n8n MCP workflow is required before this plugin can connect."}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-synthai-border bg-synthai-surface px-3 py-2 text-xs font-medium text-text-muted opacity-70"
+                        >
+                          <Plug className="h-3.5 w-3.5" />
+                          Coming soon
                         </button>
                       )}
                     </div>
