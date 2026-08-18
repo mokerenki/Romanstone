@@ -8,12 +8,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
 RUN playwright install-deps chromium
 
-COPY . .
 RUN mkdir -p /tmp/aether/sandbox
 RUN useradd -m -u 1000 aether && chown -R aether:aether /app /tmp/aether
 USER aether
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/aether/.cache/ms-playwright
 RUN playwright install chromium
+
+USER root
+COPY . .
+RUN chown -R aether:aether /app
+USER aether
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3     CMD curl -f http://localhost:8000/api/health || exit 1

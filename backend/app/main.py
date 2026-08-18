@@ -21,7 +21,7 @@ from app.api.heartbeat_config import router as heartbeat_config_router
 from app.api.tasks import router as tasks_router
 from app.api.websocket_handler import websocket_endpoint
 from app.api.memory_api import router as memory_api_router
-from app.api.integrations import router as integrations_router
+from app.api.integrations import DEFAULT_USER_ID, restore_user_scoped_tools, router as integrations_router
 from app.core.config import settings
 from app.core.proactive_scheduler import ProactiveScheduler
 from app.core.model_router_kimi_deepseek import KimiDeepSeekRouter
@@ -37,6 +37,8 @@ from app.memory.retriever_tool import MemoryRetrieverTool
 from app.services.browser_automation_service import BrowserAutomationService
 from app.core.context import synthai
 from app.services.plugin_registry import ensure_registry
+from app.services.action_catalog import ensure_action_catalog, list_actions
+from app.mcp_clients.generic_proxy_tool import GenericProxyTool
 
 logger = structlog.get_logger("aether.main")
 
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI):
     logger.info("application.startup")
 
     await ensure_registry()
+    await ensure_action_catalog()
     logger.info("plugin_registry.seeded")
 
     # Initialize Redis client for checkpointer, task queue, and embedding cache
@@ -101,6 +104,8 @@ async def lifespan(app: FastAPI):
 
     app.state.mcp_registry = MCPRegistry()
     await app.state.mcp_registry.register_all_tools(app.state.tool_registry)
+    for action in await list_actions():
+        app.state.tool_registry.register(GenericProxyTool(action))
     logger.info("mcp_tools.registered")
 
     app.state.domain_router = DomainRouter(
@@ -141,6 +146,9 @@ async def lifespan(app: FastAPI):
     instances.model_router = app.state.model_router
     instances.checkpointer = app.state.checkpointer
     instances.cognee_memory = app.state.cognee_memory
+
+    await restore_user_scoped_tools(DEFAULT_USER_ID)
+    logger.info("user_scoped_mcp_tools.restored", user_id=DEFAULT_USER_ID)
 
     yield
 

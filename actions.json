@@ -1,0 +1,37 @@
+[
+  {
+    "tool_name": "salesforce_query_leads",
+    "plugin_id": "salesforce",
+    "provider_key": "salesforce",
+    "api_path": "services/data/v59.0/query",
+    "method": "GET",
+    "description": "Query Salesforce leads using a SOQL query supplied as the query parameter."
+  },
+  {
+    "tool_name": "salesforce_list_accounts",
+    "plugin_id": "salesforce",
+    "provider_key": "salesforce",
+    "api_path": "services/data/v59.0/sobjects/Account",
+    "method": "GET",
+    "description": "List Salesforce accounts available to the connected user."
+  },
+  {
+    "tool_name": "notion_search",
+    "plugin_id": "notion",
+    "provider_key": "notion",
+    "api_path": "search",
+    "method": "POST",
+    "description": "Search pages and databases in the connected Notion workspace.",
+    "body_template": {
+      "query": "{{query}}"
+    }
+  },
+  {
+    "tool_name": "slack_list_channels",
+    "plugin_id": "slack",
+    "provider_key": "slack",
+    "api_path": "conversations.list",
+    "method": "GET",
+    "description": "List channels in the connected Slack workspace."
+  }
+]

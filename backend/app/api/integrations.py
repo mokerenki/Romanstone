@@ -1,5 +1,6 @@
 import asyncio
 import os
+import structlog
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -22,8 +23,12 @@ from app.mcp_clients.user_scoped_tool import UserScopedMCPTool
 from app.services.plugin_registry import discover_mcp_workflows, list_plugins, workflow_matches
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
+logger = structlog.get_logger("aether.integrations")
 
-DEFAULT_USER_ID = "anonymous"
+# The dashboard chat sends tasks as `dashboard`; use the same prototype
+# identity for connection endpoints until real application authentication is
+# wired in, so a user's saved OAuth connection is visible to their agent.
+DEFAULT_USER_ID = "dashboard"
 
 INTEGRATION_CATALOG: List[Dict[str, Any]] = [
     {
@@ -179,7 +184,9 @@ async def _build_plugin_registry(user_id: str) -> List[Dict[str, Any]]:
             "capabilities": plugin["feature_bullets"],
             "has_n8n_mcp_workflow": has_workflow,
             "can_connect": supported,
-            "status": "connected" if connection else "disconnected",
+            # A record is not enough: older failed attempts could persist a
+            # connection before their MCP tools were reachable.
+            "status": "connected" if (connection or {}).get("metadata", {}).get("tool_ready") else "disconnected",
             "connected_at": connection.get("connected_at") if connection else None,
         })
     return merged
@@ -341,18 +348,35 @@ async def connect_integration(
             raise HTTPException(status_code=400, detail="Nango connection ID and provider configuration key are required")
         if provider_config_key != NANGO_INTEGRATIONS[integration_id]:
             raise HTTPException(status_code=400, detail="Unexpected Nango provider configuration")
+        n8n = N8nClient()
+        previous = await get_connection(user_id, integration_id)
+        if previous and previous.get("auth_type") == "n8n":
+            await n8n.delete(previous.get("metadata", {}))
+        provisioned: Dict[str, Any] | None = None
         try:
-            provisioned = await N8nClient().provision(integration_id, user_id, connection_id, provider_config_key)
-        except N8nError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            provisioned = await n8n.provision(integration_id, user_id, connection_id, provider_config_key)
+            await _register_n8n_tools(integration_id, provisioned)
+        except Exception as exc:
+            if provisioned:
+                await n8n.delete(provisioned)
+            await delete_connection(user_id, integration_id)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Connected to {entry['name']}, but its MCP tool could not be activated: {exc}",
+            ) from exc
         await save_connection(
             user_id,
             integration_id,
             auth_type="n8n",
             connected_at=now,
-            metadata={**provisioned, "nango_connection_id": connection_id, "nango_provider_config_key": provider_config_key},
+            metadata={
+                **provisioned,
+                "nango_connection_id": connection_id,
+                "nango_provider_config_key": provider_config_key,
+                "tool_ready": True,
+                "workflow_template_version": 2,
+            },
         )
-        await _register_n8n_tools(integration_id, provisioned)
         return {
             "status": "connected",
             "integration_id": integration_id,
@@ -403,10 +427,52 @@ async def _register_n8n_tools(integration_id: str, metadata: Dict[str, Any]) -> 
     try:
         tools = await client.list_tools()
         for tool in tools:
-            tool_registry.register(UserScopedMCPTool(integration_id, tool.name, tool.description or tool.name, tool.inputSchema or {}))
+            # MCP Python models expose snake_case fields, while older SDK
+            # versions used the protocol's camelCase spelling.
+            input_schema = getattr(tool, "input_schema", getattr(tool, "inputSchema", {})) or {}
+            tool_registry.register(UserScopedMCPTool(integration_id, tool.name, tool.description or tool.name, input_schema))
         return len(tools)
     finally:
         await client.close()
+
+
+async def restore_user_scoped_tools(user_id: str) -> None:
+    """Restore MCP tools saved for a user after a backend restart."""
+    for integration_id, connection in (await list_connections(user_id)).items():
+        metadata = connection.get("metadata", {})
+        if connection.get("auth_type") != "n8n" or not metadata.get("tool_ready"):
+            continue
+        try:
+            # Upgrade workflow definitions created before the n8n expression
+            # escaping fix, reusing the user's existing Nango connection.
+            if metadata.get("workflow_template_version") != 2:
+                connection_id = metadata.get("nango_connection_id")
+                provider_key = metadata.get("nango_provider_config_key")
+                if not connection_id or not provider_key:
+                    raise RuntimeError("saved Nango connection metadata is incomplete")
+                n8n = N8nClient()
+                await n8n.delete(metadata)
+                provisioned = await n8n.provision(integration_id, user_id, connection_id, provider_key)
+                await _register_n8n_tools(integration_id, provisioned)
+                await save_connection(
+                    user_id,
+                    integration_id,
+                    auth_type="n8n",
+                    connected_at=connection.get("connected_at", datetime.now(timezone.utc).isoformat()),
+                    metadata={
+                        **provisioned,
+                        "nango_connection_id": connection_id,
+                        "nango_provider_config_key": provider_key,
+                        "tool_ready": True,
+                        "workflow_template_version": 2,
+                    },
+                )
+            else:
+                await _register_n8n_tools(integration_id, metadata)
+        except Exception as exc:
+            # Keep the stored connection; the user can retry Sync tools from
+            # the Plugins page if the external MCP service is temporarily down.
+            logger.warning("integration.tools_restore_failed", integration_id=integration_id, error=str(exc))
 
 
 @router.post("/{integration_id}/sync")

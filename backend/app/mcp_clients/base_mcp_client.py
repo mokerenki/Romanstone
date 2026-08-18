@@ -42,6 +42,7 @@ class MCPClient:
         self._sse = sse_client(self.url, headers=headers, timeout=self.timeout)
         read_stream, write_stream = await self._sse.__aenter__()
         self._session = ClientSession(read_stream, write_stream)
+        await self._session.__aenter__()
         await self._session.initialize()
         logger.info("mcp_client.connected", name=self.name)
 
@@ -62,8 +63,15 @@ class MCPClient:
         return result
 
     async def close(self):
-        if self._session:
-            await self._session.close()
-        if self._sse:
-            await self._sse.__aexit__(None, None, None)
+        # Current MCP ClientSession versions are async context managers; they
+        # intentionally do not provide a close() method. Exit it before the
+        # transport so its background tasks finish on the owning task.
+        try:
+            if self._session:
+                await self._session.__aexit__(None, None, None)
+        finally:
+            if self._sse:
+                await self._sse.__aexit__(None, None, None)
+            self._session = None
+            self._sse = None
         logger.info("mcp_client.closed", name=self.name)

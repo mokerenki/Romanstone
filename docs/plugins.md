@@ -116,6 +116,28 @@ Use `auth_status_source="unsupported"` for a visible card with a disabled **Comi
 
 Use `auth_status_source="manual"` only after adding a deliberately designed manual-credential flow. Do not reintroduce token entry for providers already supported by Nango OAuth.
 
+## Generic proxy actions
+
+For the long tail of integrations, use `action_catalog` instead of a dedicated n8n workflow per action. The shared workflow is named `SynthAI · generic-proxy`; it accepts a catalog action plus server-supplied Nango connection ID, and forwards the request through Nango Proxy.
+
+The agent sees one tool for each action catalog row, but never sees a Nango connection ID. The built-in seed actions are inserted when the backend starts. Provision the shared workflow with:
+
+```bash
+python -m scripts.provision_generic_proxy
+```
+
+To bulk-import extra actions from an `actions.json` file on the host, stream that file into the container (the host
+file is not automatically mounted inside Docker):
+
+```powershell
+Get-Content .\actions.json -Raw | docker compose exec -T backend python -m scripts.import_action_catalog -
+```
+
+The JSON must be an array. Each item needs `tool_name`, `plugin_id`, `provider_key`, `api_path`, `method`, and
+`description`; `body_template` is optional.
+
+The provisioning script requires `N8N_GENERIC_MCP_TOKEN` in `.env`. It creates the generic workflow only when it does not already exist and does not modify dedicated workflows such as `SynthAI · google · calendar`.
+
 ## Current provider mapping
 
 | Plugin | Nango integration key | Status |
